@@ -310,6 +310,7 @@ function drawCharacter() {
   if (bulbScene.active) updateBulbScene();
   else if (blocksScene.active) updateBlocksScene();
 else if (slideScene.active) updateSlideScene();
+  else if (fightScene.active) updateFightScene();
 else updateSlidingAI();
 updateLiquidPhysics();
 const now = Date.now();
