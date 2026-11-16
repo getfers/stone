@@ -5,16 +5,18 @@ let life = { state: 'alive', timer: 0, scale: 1, ghostY: 0, ghostAlpha: 0 };
 let bulbScene = { active: false, timer: 0, ladderVisible: false, bulbState: 'none', shards: [], flashAlpha: 0 };
 let blocksScene = { active: false, timer: 0, phase: 'falling', currentIdx: 0, blocks: [], shapeType: 0 };
 let slideScene = { active: false, phase: 'approach', timer: 0, progress: 0, speed: 0 };
+
 let fightScene = {
   active: false,
   timer: 0,
   phase: 'intro', // 'intro', 'fighting', 'outro'
-  enemy: { x: 420, y: 155, vx: 0, vy: 0, hp: 100 },
+  enemy: { x: 420, y: 180, vx: 0, vy: 0, hp: 100, swordAngle: -0.6 },
   playerHp: 100,
+  playerSwordAngle: 0.6,
+  slashes: [],
   sparks: [],
   flashAlpha: 0
 };
-
 
 function isAnySceneActive() {
   return vape.active || bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || life.state !== 'alive';
@@ -34,6 +36,7 @@ function triggerDeath() {
   bulbScene.active = false;
   blocksScene.active = false;
   slideScene.active = false;
+  fightScene.active = false;
   isDragging = false;
   life.state = 'dying';
   life.timer = 0;
@@ -106,247 +109,578 @@ function startSlideScene() {
   currentEmotion = 0;
 }
 
-// --- ЛОГИКА И ОТРИСОВКА ГОРКИ ---
-function updateSlideScene() {
-  slideScene.timer++;
-  const s = life.scale;
-  const floorCenterY = canvas.height - MARGIN - 54 * s;
+// --- ЗАПУСК И ЛОГИКА БОЯ (SHADOW FIGHT С КАТАНАМИ) ---
+function startFightScene() {
+  if (isAnySceneActive()) return;
+  walker.isWalking = false;
+  fightScene.active = true;
+  fightScene.timer = 0;
+  fightScene.phase = 'intro';
+  fightScene.enemy = { x: 430, y: 185, vx: 0, vy: 0, hp: 100, swordAngle: -0.6 };
+  fightScene.playerHp = 100;
+  fightScene.playerSwordAngle = 0.6;
+  fightScene.slashes = [];
+  fightScene.sparks = [];
+  fightScene.flashAlpha = 0;
+  currentEmotion = 0;
+}
 
-  if (slideScene.phase === 'approach') {
-    moveCharacterTo(105, floorCenterY, 0.11);
-    if (Math.abs(center.x - 105) < 10 && slideScene.timer > 25) {
-      slideScene.phase = 'climbing';
-      slideScene.timer = 0;
+function spawnHitSparks(x, y, color) {
+  for (let i = 0; i < 16; i++) {
+    fightScene.sparks.push({
+      x: x,
+      y: y,
+      vx: (Math.random() - 0.5) * 16,
+      vy: (Math.random() - 0.7) * 14,
+      size: 2.5 + Math.random() * 4.5,
+      color: color,
+      alpha: 1
+    });
+  }
+}
+
+function addSlashTrail(x, y, radius, startAng, endAng, color) {
+  fightScene.slashes.push({
+    x: x,
+    y: y,
+    radius: radius,
+    startAng: startAng,
+    endAng: endAng,
+    color: color,
+    alpha: 0.95
+  });
+}
+
+function updateFightScene() {
+  fightScene.timer++;
+  const t = fightScene.timer;
+  const e = fightScene.enemy;
+  const floorY = canvas.height - MARGIN - 54 * life.scale;
+
+  // Физика соперника
+  e.vy += 0.42;
+  e.x += e.vx;
+  e.y += e.vy;
+  e.vx *= 0.88;
+  if (e.y > floorY) {
+    e.y = floorY;
+    e.vy = 0;
+  }
+  if (fightScene.phase !== 'outro') {
+    e.x = Math.max(60, Math.min(canvas.width - 60, e.x));
+  }
+
+  // Плавный возврат катан в боевую стойку
+  fightScene.playerSwordAngle += (0.55 - fightScene.playerSwordAngle) * 0.15;
+  e.swordAngle += (-0.55 - e.swordAngle) * 0.15;
+
+  if (fightScene.flashAlpha > 0) {
+    fightScene.flashAlpha = Math.max(0, fightScene.flashAlpha - 0.08);
+  }
+
+  // ФАЗА 1: Заставка перед боем (0 - 135 кадр)
+  if (fightScene.phase === 'intro') {
+    moveCharacterTo(115, floorY, 0.12);
+    e.x += (365 - e.x) * 0.12;
+    if (t >= 135) {
+      fightScene.phase = 'fighting';
+      fightScene.timer = 0;
+      fightScene.flashAlpha = 0.85;
     }
-  } else if (slideScene.phase === 'climbing') {
-    const topY = 92 - 46 * s;
-    moveCharacterTo(155, topY, 0.085);
-    if (Math.abs(center.y - topY) < 6 && slideScene.timer > 45) {
-      slideScene.phase = 'sliding';
-      slideScene.progress = 0;
-      slideScene.speed = 0.008;
-      currentEmotion = 3;
+  }
+  // ФАЗА 2: Бой на катанах (0 - 250 кадр)
+  else if (fightScene.phase === 'fighting') {
+    // 1. Атака нашего камня
+    if (t === 15) {
+      for (let n of nodes) { n.vx += 18; n.vy -= 9; }
+      fightScene.playerSwordAngle = -1.2; // Замах
     }
-  } else if (slideScene.phase === 'sliding') {
-    slideScene.speed = Math.min(0.036, slideScene.speed + 0.0009);
-    slideScene.progress += slideScene.speed;
-    const t = Math.min(1, slideScene.progress);
-
-    const p0 = { x: 165, y: 92 - 46 * s };
-    const p1 = { x: 235, y: 225 - 46 * s };
-    const p2 = { x: 375, y: 250 - 46 * s };
-
-    const invT = 1 - t;
-    const targetX = invT * invT * p0.x + 2 * invT * t * p1.x + t * t * p2.x;
-    const targetY = invT * invT * p0.y + 2 * invT * t * p1.y + t * t * p2.y;
-
-    moveCharacterTo(targetX, targetY, 0.45);
-
-    if (t >= 1) {
-      slideScene.phase = 'landed';
-      slideScene.timer = 0;
-      currentEmotion = 1;
-      nextEmotionTime = Date.now() + 5000;
-      for (let i = 0; i < NUM_POINTS; i++) nodes[i].vx += 5.5;
+    if (t === 32) {
+      fightScene.playerSwordAngle = 1.6; // Удар катаной
+      addSlashTrail(center.x + 25, center.y, 75, -1.1, 1.3, '#38bdf8');
+      e.vx = 20; e.vy = -8;
+      e.hp = 65;
+      fightScene.flashAlpha = 0.55;
+      spawnHitSparks((center.x + e.x) / 2, center.y, '#38bdf8');
     }
-  } else if (slideScene.phase === 'landed') {
-    if (slideScene.timer > 125) {
-      slideScene.active = false;
+
+    // 2. Ответный выпад Тени алой катаной
+    if (t === 80) {
+      e.vx = -22; e.vy = -9;
+      e.swordAngle = 1.2; // Замах Тени
+    }
+    if (t === 96) {
+      e.swordAngle = -1.7; // Удар Тени
+      addSlashTrail(e.x - 25, e.y, 75, 1.8, 4.2, '#ef4444');
+      for (let n of nodes) { n.vx -= 18; n.vy -= 7; }
+      fightScene.playerHp = 60;
+      currentEmotion = 3; // Удивление от удара
+      fightScene.flashAlpha = 0.55;
+      spawnHitSparks((center.x + e.x) / 2, center.y, '#ef4444');
+    }
+
+    // 3. Скрещивание клинков в прыжке
+    if (t === 140) {
+      currentEmotion = 0;
+      for (let n of nodes) { n.vx += 16; n.vy -= 11; }
+      e.vx = -16; e.vy = -11;
+      fightScene.playerSwordAngle = -1.1;
+      e.swordAngle = 1.1;
+    }
+    if (t === 156) {
+      fightScene.playerSwordAngle = 1.4;
+      e.swordAngle = -1.4;
+      addSlashTrail(240, 145, 80, -0.8, 0.8, '#38bdf8');
+      addSlashTrail(240, 145, 80, 2.3, 3.9, '#ef4444');
+      for (let n of nodes) { n.vx -= 12; n.vy -= 4; }
+      e.vx = 12; e.vy = -4;
+      fightScene.playerHp = 35;
+      e.hp = 35;
+      fightScene.flashAlpha = 0.85;
+      spawnHitSparks(240, 140, '#facc15');
+    }
+
+    // 4. Решающий удар нашего камня
+    if (t === 195) {
+      for (let n of nodes) { n.vx += 24; n.vy -= 11; }
+      fightScene.playerSwordAngle = -1.4;
+    }
+    if (t === 212) {
+      fightScene.playerSwordAngle = 1.9;
+      addSlashTrail(center.x + 30, center.y, 85, -1.3, 1.5, '#38bdf8');
+      e.vx = 38; e.vy = -15;
+      e.hp = 0;
+      fightScene.flashAlpha = 0.95;
+      spawnHitSparks(e.x - 20, e.y, '#ef4444');
+      fightScene.phase = 'outro';
+      fightScene.timer = 0;
+      currentEmotion = 1; // Победная улыбка!
+    }
+  }
+  // ФАЗА 3: Победа
+  else if (fightScene.phase === 'outro') {
+    e.x += 14;
+    moveCharacterTo(240, floorY, 0.08);
+    if (t > 120) {
+      fightScene.active = false;
       walker.nextWalkTime = Date.now() + 2000;
     }
   }
 }
 
-function drawSlide() {
-  if (!slideScene.active) return;
+// Функция рисования катаны в руке
+function drawKatana(x, y, angle, bladeColor, glowColor, flip) {
   ctx.save();
-  ctx.strokeStyle = '#525660';
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(140, 92); ctx.lineTo(140, 264);
-  ctx.moveTo(170, 92); ctx.lineTo(170, 264);
-  ctx.moveTo(265, 200); ctx.lineTo(265, 264);
-  ctx.stroke();
+  ctx.translate(x, y);
+  if (flip) ctx.scale(-1, 1);
+  ctx.rotate(angle);
 
-  ctx.strokeStyle = '#a1a1aa';
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(95, 264); ctx.lineTo(140, 92);
-  ctx.stroke();
+  // Рукоять катаны
+  ctx.fillStyle = '#18181b';
+  ctx.strokeStyle = '#71717a';
+  ctx.lineWidth = 1.5;
+  ctx.fillRect(-16, -2.5, 16, 5);
+  ctx.strokeRect(-16, -2.5, 16, 5);
 
-  ctx.lineWidth = 3.5;
-  for (let i = 1; i <= 5; i++) {
-    const ratio = i / 6;
-    const sx = 95 + (140 - 95) * ratio;
-    const sy = 264 + (92 - 264) * ratio;
-    ctx.beginPath();
-    ctx.moveTo(sx - 6, sy); ctx.lineTo(sx + 8, sy);
-    ctx.stroke();
-  }
+  // Гарда (цуба)
+  ctx.fillStyle = '#eab308';
+  ctx.fillRect(0, -6, 3.5, 12);
 
-  ctx.strokeStyle = '#38bdf8';
-  ctx.lineWidth = 7;
-  ctx.lineCap = 'round';
+  // Светящееся лезвие
+  ctx.shadowColor = glowColor;
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = bladeColor;
   ctx.beginPath();
-  ctx.moveTo(138, 92); ctx.lineTo(168, 92);
-  ctx.quadraticCurveTo(235, 225, 385, 254);
-  ctx.stroke();
+  ctx.moveTo(3.5, -2.5);
+  ctx.lineTo(68, -2);
+  ctx.lineTo(76, 0); // Острие
+  ctx.lineTo(68, 2.5);
+  ctx.lineTo(3.5, 2.5);
+  ctx.closePath();
+  ctx.fill();
 
-  ctx.strokeStyle = '#bae6fd';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(138, 90); ctx.lineTo(168, 90);
-  ctx.quadraticCurveTo(235, 223, 385, 252);
-  ctx.stroke();
   ctx.restore();
 }
 
-// --- ЛОГИКА И ОТРИСОВКА КУБИКОВ ---
-function updateBlocksScene() {
-  blocksScene.timer++;
-  const floorY = canvas.height - MARGIN - 12;
+function drawFightScene() {
+  if (!fightScene.active) return;
+  const e = fightScene.enemy;
+  const t = fightScene.timer;
 
-  for (let b of blocksScene.blocks) {
-    if (!b.placed && !b.carried) {
-      b.vy += 0.45;
-      b.y += b.vy;
-      if (b.y > floorY) {
-        b.y = floorY;
-        b.vy = -b.vy * 0.35;
-      }
-    }
-  }
-
-  if (blocksScene.phase === 'falling') {
-    if (blocksScene.timer > 65) {
-      blocksScene.phase = 'collecting';
-      currentEmotion = 0;
-    }
-  } else if (blocksScene.phase === 'collecting') {
-    const b = blocksScene.blocks[blocksScene.currentIdx];
-    glideCharacterX(b.x);
-    if (Math.abs(center.x - b.x) < 28) {
-      b.carried = true;
-      blocksScene.phase = 'carrying';
-    }
-  } else if (blocksScene.phase === 'carrying') {
-    const b = blocksScene.blocks[blocksScene.currentIdx];
-    b.x = center.x;
-    b.y = center.y - 68 * life.scale;
-
-    const approachX = b.x < b.tx ? b.tx - 58 : b.tx + 58;
-    glideCharacterX(approachX);
-
-    if (Math.abs(center.x - approachX) < 22) {
-      b.carried = false;
-      b.placed = true;
-      b.x = b.tx;
-      b.y = b.ty;
-      blocksScene.currentIdx++;
-
-      if (blocksScene.currentIdx >= 4) {
-        blocksScene.phase = 'admire';
-        blocksScene.timer = 0;
-        currentEmotion = 1;
-      } else {
-        blocksScene.phase = 'collecting';
-      }
-    }
-  } else if (blocksScene.phase === 'admire') {
-    glideCharacterX(115);
-    if (blocksScene.timer > 150) {
-      blocksScene.active = false;
-      walker.nextWalkTime = Date.now() + 2000;
-    }
-  }
-}
-
-function drawBlocks() {
-  if (!blocksScene.active) return;
   ctx.save();
-  for (let b of blocksScene.blocks) {
-    const hs = b.size / 2;
-    ctx.fillStyle = b.color;
-    ctx.strokeStyle = '#111214';
-    ctx.lineWidth = 3;
+
+  // 1. ВТОРОЙ КАМЕНЬ (ТЕНЕВОЙ СОПЕРНИК)
+  if (e.x < canvas.width + 80) {
+    ctx.save();
+    ctx.translate(e.x, e.y);
+
+    // Желейное покачивание соперника
+    const squashY = 1 + Math.sin(t * 0.25) * 0.05;
+    const squashX = 1 - Math.sin(t * 0.25) * 0.05;
+    ctx.scale(squashX, squashY);
+
+    ctx.shadowColor = '#ef4444';
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = '#09090b';
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 3.5;
+
     ctx.beginPath();
-    ctx.roundRect(b.x - hs, b.y - hs, b.size, b.size, 5);
+    ctx.ellipse(0, 0, 56, 52, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
-    ctx.fillRect(b.x - hs + 4, b.y - hs + 4, b.size - 8, 5);
-  }
-  ctx.restore();
-}
+    // Злые светящиеся красные глаза соперника
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.ellipse(-18, -12, 9, 13, 0.15, 0, Math.PI * 2);
+    ctx.ellipse(4, -14, 9, 13, -0.1, 0, Math.PI * 2);
+    ctx.fill();
 
+    // Хмурые брови тени
+    ctx.strokeStyle = '#09090b';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(-28, -24); ctx.lineTo(-10, -16);
+    ctx.moveTo(14, -25); ctx.lineTo(-4, -17);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Алая катана в руках у соперника
+  drawKatana(e.x - 36, e.y + 8, e.swordAngle, '#fca5a5', '#ef4444', true);
+}
+// 2. СИНЯЯ КАТАНА В РУКАХ У НАШЕГО КАМНЯ
+drawKatana(center.x + 36 * life.scale, center.y + 8 * life.scale, fightScene.playerSwordAngle, '#e0f2fe', '#38bdf8', false);
+// 3. СЛЕДЫ ОТ ВЗМАХОВ КАТАН (SLASH TRAILS)
+for (let i = fightScene.slashes.length - 1; i >= 0; i--) {
+let sl = fightScene.slashes[i];
+sl.alpha -= 0.07;
+if (sl.alpha <= 0) {
+fightScene.slashes.splice(i, 1);
+continue;
+}
+ctx.save();
+ctx.globalAlpha = sl.alpha;
+ctx.strokeStyle = sl.color;
+ctx.shadowColor = sl.color;
+ctx.shadowBlur = 14;
+ctx.lineWidth = 9;
+ctx.lineCap = 'round';
+ctx.beginPath();
+ctx.arc(sl.x, sl.y, sl.radius, sl.startAng, sl.endAng);
+ctx.stroke();
+ctx.restore();
+}
+// 4. ПОЛОСКИ ЗДОРОВЬЯ (HP BARS)
+ctx.fillStyle = '#18181b';
+ctx.strokeStyle = '#71717a';
+ctx.lineWidth = 2;
+ctx.fillRect(18, 14, 175, 14);
+ctx.strokeRect(18, 14, 175, 14);
+ctx.fillStyle = '#38bdf8';
+ctx.fillRect(20, 16, Math.max(0, 171 * (fightScene.playerHp / 100)), 10);
+ctx.fillStyle = '#18181b';
+ctx.fillRect(canvas.width - 193, 14, 175, 14);
+ctx.strokeRect(canvas.width - 193, 14, 175, 14);
+ctx.fillStyle = '#ef4444';
+const enemyBarW = Math.max(0, 171 * (e.hp / 100));
+ctx.fillRect(canvas.width - 22 - enemyBarW, 16, enemyBarW, 10);
+// 5. ЭПИЧНАЯ ЗАСТАВКА ПЕРЕД БОЕМ (SHADOW FIGHT INTRO)
+if (fightScene.phase === 'intro') {
+const slideIn = Math.min(1, t / 18);
+ctx.fillStyle = 'rgba(9, 9, 11, 0.78)';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+// Левая боевая плашка (КАМЕНЬ)
+ctx.fillStyle = '#1e3a8a';
+ctx.strokeStyle = '#38bdf8';
+ctx.lineWidth = 3;
+ctx.beginPath();
+ctx.moveTo(-20, 48);
+ctx.lineTo(215 * slideIn, 48);
+ctx.lineTo(190 * slideIn, 96);
+ctx.lineTo(-20, 96);
+ctx.closePath();
+ctx.fill();
+ctx.stroke();
+// Правая боевая плашка (ТЕНЬ)
+ctx.fillStyle = '#7f1d1d';
+ctx.strokeStyle = '#ef4444';
+ctx.beginPath();
+ctx.moveTo(canvas.width + 20, 48);
+ctx.lineTo(canvas.width - 215 * slideIn, 48);
+ctx.lineTo(canvas.width - 190 * slideIn, 96);
+ctx.lineTo(canvas.width + 20, 96);
+ctx.closePath();
+ctx.fill();
+ctx.stroke();
+// Имена бойцов на плашках
+ctx.fillStyle = '#ffffff';
+ctx.font = '900 20px -apple-system, sans-serif';
+ctx.textAlign = 'left';
+ctx.fillText('КАМЕНЬ', 24 * slideIn, 79);
+ctx.textAlign = 'right';
+ctx.fillText('ТЕНЬ', canvas.width - 24 * slideIn, 79);
+// Надпись VS или FIGHT! по центру
+ctx.textAlign = 'center';
+if (t < 80) {
+ctx.fillStyle = '#facc15';
+ctx.shadowColor = '#facc15';
+ctx.shadowBlur = 12;
+ctx.font = '900 32px -apple-system, sans-serif';
+ctx.fillText('VS', canvas.width / 2, 83);
+} else {
+const pulse = 1 + Math.sin((t - 80) * 0.4) * 0.1;
+ctx.save();
+ctx.translate(canvas.width / 2, 138);
+ctx.scale(pulse, pulse);
+ctx.fillStyle = '#ef4444';
+ctx.shadowColor = '#ef4444';
+ctx.shadowBlur = 18;
+ctx.font = '900 48px -apple-system, sans-serif';
+ctx.fillText('FIGHT!', 0, 0);
+ctx.restore();
+}
+} else if (fightScene.phase === 'outro' && t < 90) {
+ctx.textAlign = 'center';
+ctx.fillStyle = '#facc15';
+ctx.shadowColor = '#facc15';
+ctx.shadowBlur = 15;
+ctx.font = '900 40px -apple-system, sans-serif';
+ctx.fillText('ПОБЕДА!', canvas.width / 2, 86);
+}
+// 6. ИСКРЫ ОТ СТОЛКНОВЕНИЯ КАТАН
+for (let i = fightScene.sparks.length - 1; i >= 0; i--) {
+let s = fightScene.sparks[i];
+s.x += s.vx; s.y += s.vy; s.vy += 0.4; s.alpha -= 0.04;
+if (s.alpha <= 0) { fightScene.sparks.splice(i, 1); continue; }
+ctx.fillStyle = s.color;
+ctx.globalAlpha = s.alpha;
+ctx.fillRect(s.x, s.y, s.size, s.size);
+}
+ctx.globalAlpha = 1;
+if (fightScene.flashAlpha > 0) {
+ctx.fillStyle = 'rgba(255, 255, 255, ' + fightScene.flashAlpha.toFixed(2) + ')';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+ctx.restore();
+}
+// --- ЛОГИКА И ОТРИСОВКА ГОРКИ ---
+function updateSlideScene() {
+slideScene.timer++;
+const s = life.scale;
+const floorCenterY = canvas.height - MARGIN - 54 * s;
+if (slideScene.phase === 'approach') {
+moveCharacterTo(105, floorCenterY, 0.11);
+if (Math.abs(center.x - 105) < 10 && slideScene.timer > 25) {
+slideScene.phase = 'climbing';
+slideScene.timer = 0;
+}
+} else if (slideScene.phase === 'climbing') {
+const topY = 92 - 46 * s;
+moveCharacterTo(155, topY, 0.085);
+if (Math.abs(center.y - topY) < 6 && slideScene.timer > 45) {
+slideScene.phase = 'sliding';
+slideScene.progress = 0;
+slideScene.speed = 0.008;
+currentEmotion = 3;
+}
+} else if (slideScene.phase === 'sliding') {
+slideScene.speed = Math.min(0.036, slideScene.speed + 0.0009);
+slideScene.progress += slideScene.speed;
+const t = Math.min(1, slideScene.progress);
+const p0 = { x: 165, y: 92 - 46 * s };
+const p1 = { x: 235, y: 225 - 46 * s };
+const p2 = { x: 375, y: 250 - 46 * s };
+const invT = 1 - t;
+const targetX = invT * invT * p0.x + 2 * invT * t * p1.x + t * t * p2.x;
+const targetY = invT * invT * p0.y + 2 * invT * t * p1.y + t * t * p2.y;
+moveCharacterTo(targetX, targetY, 0.45);
+if (t >= 1) {
+slideScene.phase = 'landed';
+slideScene.timer = 0;
+currentEmotion = 1;
+nextEmotionTime = Date.now() + 5000;
+for (let i = 0; i < NUM_POINTS; i++) nodes[i].vx += 5.5;
+}
+} else if (slideScene.phase === 'landed') {
+if (slideScene.timer > 125) {
+slideScene.active = false;
+walker.nextWalkTime = Date.now() + 2000;
+}
+}
+}
+function drawSlide() {
+if (!slideScene.active) return;
+ctx.save();
+ctx.strokeStyle = '#525660';
+ctx.lineWidth = 5;
+ctx.lineCap = 'round';
+ctx.beginPath();
+ctx.moveTo(140, 92); ctx.lineTo(140, 264);
+ctx.moveTo(170, 92); ctx.lineTo(170, 264);
+ctx.moveTo(265, 200); ctx.lineTo(265, 264);
+ctx.stroke();
+ctx.strokeStyle = '#a1a1aa';
+ctx.lineWidth = 5;
+ctx.beginPath();
+ctx.moveTo(95, 264); ctx.lineTo(140, 92);
+ctx.stroke();
+ctx.lineWidth = 3.5;
+for (let i = 1; i <= 5; i++) {
+const ratio = i / 6;
+const sx = 95 + (140 - 95) * ratio;
+const sy = 264 + (92 - 264) * ratio;
+ctx.beginPath();
+ctx.moveTo(sx - 6, sy); ctx.lineTo(sx + 8, sy);
+ctx.stroke();
+}
+ctx.strokeStyle = '#38bdf8';
+ctx.lineWidth = 7;
+ctx.lineCap = 'round';
+ctx.beginPath();
+ctx.moveTo(138, 92); ctx.lineTo(168, 92);
+ctx.quadraticCurveTo(235, 225, 385, 254);
+ctx.stroke();
+ctx.strokeStyle = '#bae6fd';
+ctx.lineWidth = 2;
+ctx.beginPath();
+ctx.moveTo(138, 90); ctx.lineTo(168, 90);
+ctx.quadraticCurveTo(235, 223, 385, 252);
+ctx.stroke();
+ctx.restore();
+}
+// --- ЛОГИКА И ОТРИСОВКА КУБИКОВ ---
+function updateBlocksScene() {
+blocksScene.timer++;
+const floorY = canvas.height - MARGIN - 12;
+for (let b of blocksScene.blocks) {
+if (!b.placed && !b.carried) {
+b.vy += 0.45;
+b.y += b.vy;
+if (b.y > floorY) {
+b.y = floorY;
+b.vy = -b.vy * 0.35;
+}
+}
+}
+if (blocksScene.phase === 'falling') {
+if (blocksScene.timer > 65) {
+blocksScene.phase = 'collecting';
+currentEmotion = 0;
+}
+} else if (blocksScene.phase === 'collecting') {
+const b = blocksScene.blocks[blocksScene.currentIdx];
+glideCharacterX(b.x);
+if (Math.abs(center.x - b.x) < 28) {
+b.carried = true;
+blocksScene.phase = 'carrying';
+}
+} else if (blocksScene.phase === 'carrying') {
+const b = blocksScene.blocks[blocksScene.currentIdx];
+b.x = center.x;
+b.y = center.y - 68 * life.scale;
+const approachX = b.x < b.tx ? b.tx - 58 : b.tx + 58;
+glideCharacterX(approachX);
+if (Math.abs(center.x - approachX) < 22) {
+b.carried = false;
+b.placed = true;
+b.x = b.tx;
+b.y = b.ty;
+blocksScene.currentIdx++;
+if (blocksScene.currentIdx >= 4) {
+blocksScene.phase = 'admire';
+blocksScene.timer = 0;
+currentEmotion = 1;
+} else {
+blocksScene.phase = 'collecting';
+}
+}
+} else if (blocksScene.phase === 'admire') {
+glideCharacterX(115);
+if (blocksScene.timer > 150) {
+blocksScene.active = false;
+walker.nextWalkTime = Date.now() + 2000;
+}
+}
+}
+function drawBlocks() {
+if (!blocksScene.active) return;
+ctx.save();
+for (let b of blocksScene.blocks) {
+const hs = b.size / 2;
+ctx.fillStyle = b.color;
+ctx.strokeStyle = '#111214';
+ctx.lineWidth = 3;
+ctx.beginPath();
+ctx.roundRect(b.x - hs, b.y - hs, b.size, b.size, 5);
+ctx.fill();
+ctx.stroke();
+ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+ctx.fillRect(b.x - hs + 4, b.y - hs + 4, b.size - 8, 5);
+}
+ctx.restore();
+}
 // --- ЛОГИКА И ОТРИСОВКА ЛАМПОЧКИ ---
 function updateBulbScene() {
-  bulbScene.timer++;
-  const t = bulbScene.timer;
-
-  if (t <= 55) {
-    moveCharacterTo(240, 200, 0.12);
-  } else if (t > 55 && t <= 110) {
-    moveCharacterTo(240, 115, 0.1);
-  } else if (t > 110 && t <= 170) {
-    const wiggle = Math.sin(t * 0.5) * 6;
-    moveCharacterTo(240 + wiggle, 115, 0.25);
-    if (t === 155) {
-      bulbScene.bulbState = 'lit';
-      currentEmotion = 1;
-    }
-  } else if (t > 170 && t <= 225) {
-    moveCharacterTo(240, 200, 0.11);
-  } else if (t === 226) {
-    bulbScene.ladderVisible = false;
-    currentEmotion = 0;
-  } else if (t === 286) {
-    bulbScene.bulbState = 'broken';
-    bulbScene.flashAlpha = 0.85;
-    currentEmotion = 3;
-    nextEmotionTime = Date.now() + 4500;
-
-    for (let i = 0; i < NUM_POINTS; i++) {
-      nodes[i].vy -= (nodes[i].oy < 0 ? 7 : 3);
-      nodes[i].vx += (Math.random() - 0.5) * 10;
-    }
-
-    for (let k = 0; k < 14; k++) {
-      bulbScene.shards.push({ x: 240 + (Math.random() - 0.5) * 16, y: 44 + (Math.random() - 0.5) * 16, vx: (Math.random() - 0.5) * 9, vy: (Math.random() - 0.7) * 7, size: 3 + Math.random() * 4, alpha: 1 });
-    }
-  } else if (t > 380) {
-    bulbScene.active = false;
-    bulbScene.bulbState = 'none';
-    walker.nextWalkTime = Date.now() + 2000;
-  }
-
-  if (bulbScene.flashAlpha > 0) bulbScene.flashAlpha = Math.max(0, bulbScene.flashAlpha - 0.06);
+bulbScene.timer++;
+const t = bulbScene.timer;
+if (t <= 55) {
+moveCharacterTo(240, 200, 0.12);
+} else if (t > 55 && t <= 110) {
+moveCharacterTo(240, 115, 0.1);
+} else if (t > 110 && t <= 170) {
+const wiggle = Math.sin(t * 0.5) * 6;
+moveCharacterTo(240 + wiggle, 115, 0.25);
+if (t === 155) {
+bulbScene.bulbState = 'lit';
+currentEmotion = 1;
 }
-
+} else if (t > 170 && t <= 225) {
+moveCharacterTo(240, 200, 0.11);
+} else if (t === 226) {
+bulbScene.ladderVisible = false;
+currentEmotion = 0;
+} else if (t === 286) {
+bulbScene.bulbState = 'broken';
+bulbScene.flashAlpha = 0.85;
+currentEmotion = 3;
+nextEmotionTime = Date.now() + 4500;
+for (let i = 0; i < NUM_POINTS; i++) {
+nodes[i].vy -= (nodes[i].oy < 0 ? 7 : 3);
+nodes[i].vx += (Math.random() - 0.5) * 10;
+}
+for (let k = 0; k < 14; k++) {
+bulbScene.shards.push({ x: 240 + (Math.random() - 0.5) * 16, y: 44 + (Math.random() - 0.5) * 16, vx: (Math.random() - 0.5) * 9, vy: (Math.random() - 0.7) * 7, size: 3 + Math.random() * 4, alpha: 1 });
+}
+} else if (t > 380) {
+bulbScene.active = false;
+bulbScene.bulbState = 'none';
+walker.nextWalkTime = Date.now() + 2000;
+}
+if (bulbScene.flashAlpha > 0) bulbScene.flashAlpha = Math.max(0, bulbScene.flashAlpha - 0.06);
+}
 function drawLadder() {
-  if (!bulbScene.ladderVisible) return;
-  ctx.save();
-  ctx.strokeStyle = '#a1a1aa';
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(212, 264); ctx.lineTo(222, 105);
-  ctx.moveTo(268, 264); ctx.lineTo(258, 105);
-  ctx.stroke();
-
-  ctx.lineWidth = 4;
-  for (let y = 125; y <= 245; y += 30) {
-    const ratio = (y - 105) / (264 - 105);
-    const halfW = 18 + ratio * 10;
-    ctx.beginPath();
-    ctx.moveTo(240 - halfW, y); ctx.lineTo(240 + halfW, y);
-    ctx.stroke();
-  }
-  ctx.restore();
+if (!bulbScene.ladderVisible) return;
+ctx.save();
+ctx.strokeStyle = '#a1a1aa';
+ctx.lineWidth = 5;
+ctx.lineCap = 'round';
+ctx.beginPath();
+ctx.moveTo(212, 264); ctx.lineTo(222, 105);
+ctx.moveTo(268, 264); ctx.lineTo(258, 105);
+ctx.stroke();
+ctx.lineWidth = 4;
+for (let y = 125; y <= 245; y += 30) {
+const ratio = (y - 105) / (264 - 105);
+const halfW = 18 + ratio * 10;
+ctx.beginPath();
+ctx.moveTo(240 - halfW, y); ctx.lineTo(240 + halfW, y);
+ctx.stroke();
 }
-
+ctx.restore();
+}
 function drawBulbAndSocket() {
 if (!bulbScene.active) return;
 ctx.save();
@@ -477,227 +811,4 @@ ctx.fill();
 ctx.restore();
 }
 if (life.timer >= 165) triggerRebirth();
-}
-// --- ЛОГИКА И ОТРИСОВКА БОЯ (SHADOW FIGHT) ---
-function startFightScene() {
-  if (isAnySceneActive()) return;
-  walker.isWalking = false;
-  fightScene.active = true;
-  fightScene.timer = 0;
-  fightScene.phase = 'intro';
-  fightScene.enemy = { x: 380, y: 180, vx: 0, vy: 0, hp: 100 };
-  fightScene.playerHp = 100;
-  fightScene.sparks = [];
-  fightScene.flashAlpha = 0;
-  currentEmotion = 0;
-}
-
-function spawnHitSparks(x, y, color) {
-  for (let i = 0; i < 12; i++) {
-    fightScene.sparks.push({
-      x: x,
-      y: y,
-      vx: (Math.random() - 0.5) * 14,
-      vy: (Math.random() - 0.7) * 12,
-      size: 2.5 + Math.random() * 4,
-      color: color,
-      alpha: 1
-    });
-  }
-}
-
-function updateFightScene() {
-  fightScene.timer++;
-  const t = fightScene.timer;
-  const e = fightScene.enemy;
-  const floorY = canvas.height - MARGIN - 54 * life.scale;
-
-  // Физика теневого противника
-  e.vy += 0.42;
-  e.x += e.vx;
-  e.y += e.vy;
-  e.vx *= 0.88;
-  if (e.y > floorY) {
-    e.y = floorY;
-    e.vy = 0;
-  }
-  e.x = Math.max(60, Math.min(canvas.width - 60, e.x));
-
-  if (fightScene.flashAlpha > 0) {
-    fightScene.flashAlpha = Math.max(0, fightScene.flashAlpha - 0.08);
-  }
-
-  // Фаза 1: Заставка в стиле Shadow Fight (0 - 110 кадр)
-  if (fightScene.phase === 'intro') {
-    moveCharacterTo(120, floorY, 0.12);
-    e.x += (360 - e.x) * 0.12;
-    if (t >= 110) {
-      fightScene.phase = 'fighting';
-      fightScene.timer = 0;
-      fightScene.flashAlpha = 0.7;
-    }
-  } 
-  // Фаза 2: Динамичный обмен ударами (0 - 240 кадр)
-  else if (fightScene.phase === 'fighting') {
-    // 1-й удар: Наш камушек прыгает с разбега
-    if (t === 15) {
-      for (let n of nodes) { n.vx += 16; n.vy -= 9; }
-    }
-    if (t === 32) {
-      e.vx = 18; e.vy = -8;
-      e.hp = 65;
-      fightScene.flashAlpha = 0.5;
-      spawnHitSparks((center.x + e.x) / 2, center.y, '#ef4444');
-    }
-
-    // 2-й удар: Контратака теневого камня
-    if (t === 75) {
-      e.vx = -20; e.vy = -9;
-    }
-    if (t === 92) {
-      for (let n of nodes) { n.vx -= 16; n.vy -= 7; }
-      fightScene.playerHp = 60;
-      currentEmotion = 3; // Удивление от удара
-      fightScene.flashAlpha = 0.5;
-      spawnHitSparks((center.x + e.x) / 2, center.y, '#f59e0b');
-    }
-
-    // 3-й удар: Взаимное столкновение в воздухе
-    if (t === 135) {
-      currentEmotion = 0;
-      for (let n of nodes) { n.vx += 15; n.vy -= 11; }
-      e.vx = -15; e.vy = -11;
-    }
-    if (t === 152) {
-      for (let n of nodes) { n.vx -= 12; n.vy -= 4; }
-      e.vx = 12; e.vy = -4;
-      fightScene.playerHp = 35;
-      e.hp = 30;
-      fightScene.flashAlpha = 0.8;
-      spawnHitSparks(240, 140, '#ffffff');
-    }
-
-    // 4-й удар: Финальный нокаут от нашего камушка
-    if (t === 190) {
-      for (let n of nodes) { n.vx += 22; n.vy -= 10; }
-    }
-    if (t === 206) {
-      e.vx = 35; e.vy = -14;
-      e.hp = 0;
-      fightScene.flashAlpha = 0.9;
-      spawnHitSparks(e.x - 20, e.y, '#ef4444');
-      fightScene.phase = 'outro';
-      fightScene.timer = 0;
-      currentEmotion = 1; // Победная улыбка!
-    }
-  } 
-  // Фаза 3: Победа и завершение (0 - 110 кадр)
-  else if (fightScene.phase === 'outro') {
-    e.x += 12; // Противник улетает за экран
-    moveCharacterTo(240, floorY, 0.08);
-    if (t > 110) {
-      fightScene.active = false;
-      walker.nextWalkTime = Date.now() + 2000;
-    }
-  }
-}
-
-function drawFightScene() {
-  if (!fightScene.active) return;
-  const e = fightScene.enemy;
-  const t = fightScene.timer;
-
-  ctx.save();
-
-  // Затемнение фона для атмосферы Shadow Fight
-  if (fightScene.phase === 'intro') {
-    ctx.fillStyle = 'rgba(10, 10, 12, 0.72)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
-
-  // Отрисовка Теневого Противника (черный силуэт со светящимися красными глазами)
-  if (e.x < canvas.width + 60) {
-    ctx.save();
-    ctx.translate(e.x, e.y);
-    
-    // Теневая аура
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 15;
-    ctx.fillStyle = '#09090b';
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 2.5;
-
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 56, 52, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Злые светящиеся глаза тени (смотрят влево на нашего персонажа)
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath();
-    ctx.ellipse(-18, -12, 9, 12, 0.15, 0, Math.PI * 2);
-    ctx.ellipse(4, -14, 9, 12, -0.1, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // Полоски здоровья (HP Bars) сверху экрана
-  ctx.fillStyle = '#18181b';
-  ctx.strokeStyle = '#52525b';
-  ctx.lineWidth = 2;
-  // Полоска нашего камня (слева)
-  ctx.fillRect(20, 16, 175, 14);
-  ctx.strokeRect(20, 16, 175, 14);
-  ctx.fillStyle = '#eab308';
-  ctx.fillRect(22, 18, Math.max(0, 171 * (fightScene.playerHp / 100)), 10);
-
-  // Полоска Тени (справа)
-  ctx.fillStyle = '#18181b';
-  ctx.fillRect(canvas.width - 195, 16, 175, 14);
-  ctx.strokeRect(canvas.width - 195, 16, 175, 14);
-  ctx.fillStyle = '#ef4444';
-  const enemyBarW = Math.max(0, 171 * (e.hp / 100));
-  ctx.fillRect(canvas.width - 24 - enemyBarW, 18, enemyBarW, 10);
-
-  // Надписи заставки VS и FIGHT!
-  ctx.textAlign = 'center';
-  ctx.font = '900 32px -apple-system, sans-serif';
-  if (fightScene.phase === 'intro') {
-    if (t < 65) {
-      ctx.fillStyle = '#f4f4f5';
-      ctx.fillText('КАМЕНЬ  VS  ТЕНЬ', canvas.width / 2, 78);
-    } else {
-      ctx.fillStyle = '#ef4444';
-      ctx.shadowColor = '#ef4444';
-      ctx.shadowBlur = 12;
-      ctx.font = '900 44px -apple-system, sans-serif';
-      ctx.fillText('FIGHT!', canvas.width / 2, 84);
-    }
-  } else if (fightScene.phase === 'outro' && t < 80) {
-    ctx.fillStyle = '#eab308';
-    ctx.shadowColor = '#eab308';
-    ctx.shadowBlur = 12;
-    ctx.font = '900 38px -apple-system, sans-serif';
-    ctx.fillText('ПОБЕДА!', canvas.width / 2, 84);
-  }
-
-  // Искры от ударов
-  for (let i = fightScene.sparks.length - 1; i >= 0; i--) {
-    let s = fightScene.sparks[i];
-    s.x += s.vx; s.y += s.vy; s.vy += 0.4; s.alpha -= 0.04;
-    if (s.alpha <= 0) { fightScene.sparks.splice(i, 1); continue; }
-    ctx.fillStyle = s.color;
-    ctx.globalAlpha = s.alpha;
-    ctx.fillRect(s.x, s.y, s.size, s.size);
-  }
-  ctx.globalAlpha = 1;
-
-  // Вспышка при сильном ударе
-  if (fightScene.flashAlpha > 0) {
-    ctx.fillStyle = 'rgba(255, 255, 255, ' + fightScene.flashAlpha.toFixed(2) + ')';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
-
-  ctx.restore();
 }
