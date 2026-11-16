@@ -309,7 +309,7 @@ function drawCharacter() {
 
   if (bulbScene.active) updateBulbScene();
   else if (blocksScene.active) updateBlocksScene();
-  else if (slideScene.active) updateSlideScene();
+else if (slideScene.active) updateSlideScene();
 else updateSlidingAI();
 updateLiquidPhysics();
 const now = Date.now();
@@ -479,7 +479,7 @@ video.webkitSetPresentationMode(video.webkitPresentationMode === "picture-in-pic
 } else if (document.pictureInPictureEnabled) {
 await video.requestPictureInPicture();
 }
-  } catch (err) {
-    alert('Ошибка запуска окна: ' + err.message);
-  }
+} catch (err) {
+lert('Ошибка запуска окна: ' + err.message);
+}
 });
