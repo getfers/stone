@@ -1,4 +1,3 @@
-```javascript
 const canvas = document.getElementById('scene');
 const ctx = canvas.getContext('2d');
 const video = document.getElementById('pipVideo');
@@ -305,11 +304,12 @@ function drawCharacter() {
   }
 
   if (!vape.active && life.state === 'alive' && vape.blueLevel > 0) {
-vape.blueLevel = Math.max(0, vape.blueLevel - 0.0004);
-}
-if (bulbScene.active) updateBulbScene();
-else if (blocksScene.active) updateBlocksScene();
-else if (slideScene.active) updateSlideScene();
+    vape.blueLevel = Math.max(0, vape.blueLevel - 0.0004);
+  }
+
+  if (bulbScene.active) updateBulbScene();
+  else if (blocksScene.active) updateBlocksScene();
+  else if (slideScene.active) updateSlideScene();
 else updateSlidingAI();
 updateLiquidPhysics();
 const now = Date.now();
@@ -479,7 +479,7 @@ video.webkitSetPresentationMode(video.webkitPresentationMode === "picture-in-pic
 } else if (document.pictureInPictureEnabled) {
 await video.requestPictureInPicture();
 }
-} catch (err) {
-alert('Ошибка запуска окна: ' + err.message);
-}
+  } catch (err) {
+    alert('Ошибка запуска окна: ' + err.message);
+  }
 });
