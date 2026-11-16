@@ -5,9 +5,19 @@ let life = { state: 'alive', timer: 0, scale: 1, ghostY: 0, ghostAlpha: 0 };
 let bulbScene = { active: false, timer: 0, ladderVisible: false, bulbState: 'none', shards: [], flashAlpha: 0 };
 let blocksScene = { active: false, timer: 0, phase: 'falling', currentIdx: 0, blocks: [], shapeType: 0 };
 let slideScene = { active: false, phase: 'approach', timer: 0, progress: 0, speed: 0 };
+let fightScene = {
+  active: false,
+  timer: 0,
+  phase: 'intro', // 'intro', 'fighting', 'outro'
+  enemy: { x: 420, y: 155, vx: 0, vy: 0, hp: 100 },
+  playerHp: 100,
+  sparks: [],
+  flashAlpha: 0
+};
+
 
 function isAnySceneActive() {
-  return vape.active || bulbScene.active || blocksScene.active || slideScene.active || life.state !== 'alive';
+  return vape.active || bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || life.state !== 'alive';
 }
 
 function startVape() {
@@ -467,4 +477,227 @@ ctx.fill();
 ctx.restore();
 }
 if (life.timer >= 165) triggerRebirth();
+}
+// --- ЛОГИКА И ОТРИСОВКА БОЯ (SHADOW FIGHT) ---
+function startFightScene() {
+  if (isAnySceneActive()) return;
+  walker.isWalking = false;
+  fightScene.active = true;
+  fightScene.timer = 0;
+  fightScene.phase = 'intro';
+  fightScene.enemy = { x: 380, y: 180, vx: 0, vy: 0, hp: 100 };
+  fightScene.playerHp = 100;
+  fightScene.sparks = [];
+  fightScene.flashAlpha = 0;
+  currentEmotion = 0;
+}
+
+function spawnHitSparks(x, y, color) {
+  for (let i = 0; i < 12; i++) {
+    fightScene.sparks.push({
+      x: x,
+      y: y,
+      vx: (Math.random() - 0.5) * 14,
+      vy: (Math.random() - 0.7) * 12,
+      size: 2.5 + Math.random() * 4,
+      color: color,
+      alpha: 1
+    });
+  }
+}
+
+function updateFightScene() {
+  fightScene.timer++;
+  const t = fightScene.timer;
+  const e = fightScene.enemy;
+  const floorY = canvas.height - MARGIN - 54 * life.scale;
+
+  // Физика теневого противника
+  e.vy += 0.42;
+  e.x += e.vx;
+  e.y += e.vy;
+  e.vx *= 0.88;
+  if (e.y > floorY) {
+    e.y = floorY;
+    e.vy = 0;
+  }
+  e.x = Math.max(60, Math.min(canvas.width - 60, e.x));
+
+  if (fightScene.flashAlpha > 0) {
+    fightScene.flashAlpha = Math.max(0, fightScene.flashAlpha - 0.08);
+  }
+
+  // Фаза 1: Заставка в стиле Shadow Fight (0 - 110 кадр)
+  if (fightScene.phase === 'intro') {
+    moveCharacterTo(120, floorY, 0.12);
+    e.x += (360 - e.x) * 0.12;
+    if (t >= 110) {
+      fightScene.phase = 'fighting';
+      fightScene.timer = 0;
+      fightScene.flashAlpha = 0.7;
+    }
+  } 
+  // Фаза 2: Динамичный обмен ударами (0 - 240 кадр)
+  else if (fightScene.phase === 'fighting') {
+    // 1-й удар: Наш камушек прыгает с разбега
+    if (t === 15) {
+      for (let n of nodes) { n.vx += 16; n.vy -= 9; }
+    }
+    if (t === 32) {
+      e.vx = 18; e.vy = -8;
+      e.hp = 65;
+      fightScene.flashAlpha = 0.5;
+      spawnHitSparks((center.x + e.x) / 2, center.y, '#ef4444');
+    }
+
+    // 2-й удар: Контратака теневого камня
+    if (t === 75) {
+      e.vx = -20; e.vy = -9;
+    }
+    if (t === 92) {
+      for (let n of nodes) { n.vx -= 16; n.vy -= 7; }
+      fightScene.playerHp = 60;
+      currentEmotion = 3; // Удивление от удара
+      fightScene.flashAlpha = 0.5;
+      spawnHitSparks((center.x + e.x) / 2, center.y, '#f59e0b');
+    }
+
+    // 3-й удар: Взаимное столкновение в воздухе
+    if (t === 135) {
+      currentEmotion = 0;
+      for (let n of nodes) { n.vx += 15; n.vy -= 11; }
+      e.vx = -15; e.vy = -11;
+    }
+    if (t === 152) {
+      for (let n of nodes) { n.vx -= 12; n.vy -= 4; }
+      e.vx = 12; e.vy = -4;
+      fightScene.playerHp = 35;
+      e.hp = 30;
+      fightScene.flashAlpha = 0.8;
+      spawnHitSparks(240, 140, '#ffffff');
+    }
+
+    // 4-й удар: Финальный нокаут от нашего камушка
+    if (t === 190) {
+      for (let n of nodes) { n.vx += 22; n.vy -= 10; }
+    }
+    if (t === 206) {
+      e.vx = 35; e.vy = -14;
+      e.hp = 0;
+      fightScene.flashAlpha = 0.9;
+      spawnHitSparks(e.x - 20, e.y, '#ef4444');
+      fightScene.phase = 'outro';
+      fightScene.timer = 0;
+      currentEmotion = 1; // Победная улыбка!
+    }
+  } 
+  // Фаза 3: Победа и завершение (0 - 110 кадр)
+  else if (fightScene.phase === 'outro') {
+    e.x += 12; // Противник улетает за экран
+    moveCharacterTo(240, floorY, 0.08);
+    if (t > 110) {
+      fightScene.active = false;
+      walker.nextWalkTime = Date.now() + 2000;
+    }
+  }
+}
+
+function drawFightScene() {
+  if (!fightScene.active) return;
+  const e = fightScene.enemy;
+  const t = fightScene.timer;
+
+  ctx.save();
+
+  // Затемнение фона для атмосферы Shadow Fight
+  if (fightScene.phase === 'intro') {
+    ctx.fillStyle = 'rgba(10, 10, 12, 0.72)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // Отрисовка Теневого Противника (черный силуэт со светящимися красными глазами)
+  if (e.x < canvas.width + 60) {
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    
+    // Теневая аура
+    ctx.shadowColor = '#ef4444';
+    ctx.shadowBlur = 15;
+    ctx.fillStyle = '#09090b';
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2.5;
+
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 56, 52, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Злые светящиеся глаза тени (смотрят влево на нашего персонажа)
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.ellipse(-18, -12, 9, 12, 0.15, 0, Math.PI * 2);
+    ctx.ellipse(4, -14, 9, 12, -0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Полоски здоровья (HP Bars) сверху экрана
+  ctx.fillStyle = '#18181b';
+  ctx.strokeStyle = '#52525b';
+  ctx.lineWidth = 2;
+  // Полоска нашего камня (слева)
+  ctx.fillRect(20, 16, 175, 14);
+  ctx.strokeRect(20, 16, 175, 14);
+  ctx.fillStyle = '#eab308';
+  ctx.fillRect(22, 18, Math.max(0, 171 * (fightScene.playerHp / 100)), 10);
+
+  // Полоска Тени (справа)
+  ctx.fillStyle = '#18181b';
+  ctx.fillRect(canvas.width - 195, 16, 175, 14);
+  ctx.strokeRect(canvas.width - 195, 16, 175, 14);
+  ctx.fillStyle = '#ef4444';
+  const enemyBarW = Math.max(0, 171 * (e.hp / 100));
+  ctx.fillRect(canvas.width - 24 - enemyBarW, 18, enemyBarW, 10);
+
+  // Надписи заставки VS и FIGHT!
+  ctx.textAlign = 'center';
+  ctx.font = '900 32px -apple-system, sans-serif';
+  if (fightScene.phase === 'intro') {
+    if (t < 65) {
+      ctx.fillStyle = '#f4f4f5';
+      ctx.fillText('КАМЕНЬ  VS  ТЕНЬ', canvas.width / 2, 78);
+    } else {
+      ctx.fillStyle = '#ef4444';
+      ctx.shadowColor = '#ef4444';
+      ctx.shadowBlur = 12;
+      ctx.font = '900 44px -apple-system, sans-serif';
+      ctx.fillText('FIGHT!', canvas.width / 2, 84);
+    }
+  } else if (fightScene.phase === 'outro' && t < 80) {
+    ctx.fillStyle = '#eab308';
+    ctx.shadowColor = '#eab308';
+    ctx.shadowBlur = 12;
+    ctx.font = '900 38px -apple-system, sans-serif';
+    ctx.fillText('ПОБЕДА!', canvas.width / 2, 84);
+  }
+
+  // Искры от ударов
+  for (let i = fightScene.sparks.length - 1; i >= 0; i--) {
+    let s = fightScene.sparks[i];
+    s.x += s.vx; s.y += s.vy; s.vy += 0.4; s.alpha -= 0.04;
+    if (s.alpha <= 0) { fightScene.sparks.splice(i, 1); continue; }
+    ctx.fillStyle = s.color;
+    ctx.globalAlpha = s.alpha;
+    ctx.fillRect(s.x, s.y, s.size, s.size);
+  }
+  ctx.globalAlpha = 1;
+
+  // Вспышка при сильном ударе
+  if (fightScene.flashAlpha > 0) {
+    ctx.fillStyle = 'rgba(255, 255, 255, ' + fightScene.flashAlpha.toFixed(2) + ')';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  ctx.restore();
 }
