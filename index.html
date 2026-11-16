@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pet Rock PiP</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    html, body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100vh; margin: 0; padding: 16px; background: #18191c; color: #e4e4e7; overflow: hidden; }
+    canvas { width: min(92vw, 360px); height: calc(min(92vw, 360px) * 0.5625); background: #232529; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); border: 1px solid #32353b; touch-action: none; }
+    .controls { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; width: min(92vw, 360px); }
+    .row { display: flex; gap: 10px; width: 100%; }
+    button { padding: 14px 10px; font-size: 14px; font-weight: 600; color: white; background: #3f424a; border: 1px solid #525660; border-radius: 14px; flex: 1; cursor: pointer; }
+    button.sec { background: #2b2d33; color: #e4e4e7; }
+    button.active { background: #2563eb; border-color: #3b82f6; }
+    button:active { opacity: 0.8; }
+    video { width: 1px; height: 1px; opacity: 0.01; position: absolute; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <canvas id="scene" width="480" height="270"></canvas>
+  <video id="pipVideo" muted playsinline autoplay></video>
+  <div class="controls">
+    <div class="row">
+      <button id="pipBtn">В окно (PiP)</button>
+      <button class="sec" id="tiltBtn">Гироскоп: ВЫКЛ</button>
+    </div>
+    <div class="row">
+      <button class="sec" onclick="startVape()">Попарить</button>
+      <button class="sec" onclick="startBulbScene()">Лампочка</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    const video = document.getElementById('pipVideo');
+    const btn = document.getElementById('pipBtn');
+    const tiltBtn = document.getElementById('tiltBtn');
+
+    // 4 настроения: прямая линия, улыбка, грусть, удивление
+    const emotions = ['classic', 'happy', 'sad', 'surprised'];
+    let currentEmotion = 0;
+    let nextEmotionTime = Date.now() + 5000 + Math.random() * 4000;
+
+    let walker = {
+      isWalking: false,
+      targetX: 240,
+      nextWalkTime: Date.now() + 1500
+    };
+
+    let vape = {
+      active: false,
+      timer: 0,
+      duration: 210,
+      nextAutoTime: Date.now() + 10000 + Math.random() * 8000
+    };
+    let vaporParticles = [];
+
+    let bulbScene = {
+      active: false,
+      timer: 0,
+      ladderVisible: false,
+      bulbState: 'none',
+      shards: [],
+      flashAlpha: 0
+    };
+
+    const NUM_POINTS = 16;
+    let nodes = [];
+    let center = { x: 240, y: 155, vx: 0, vy: 0 };
+    let isDragging = false;
+    let dragMoved = false;
+    let lastPointer = { x: 0, y: 0 };
+
+    // Вектор гравитации для гироскопа
+    let gravity = { x: 0, y: 0.42 };
+    let tiltEnabled = false;
+
+    function initNodes() {
+      nodes = [];
+      for (let i = 0; i < NUM_POINTS; i++) {
+        const angle = (i / NUM_POINTS) * Math.PI * 2;
+        let baseR = 62;
+        if (Math.sin(angle) > 0) baseR += Math.sin(angle) * 9;
+        if (Math.cos(angle) < 0 && Math.sin(angle) > 0) baseR += 4;
+        const ox = Math.cos(angle) * baseR;
+        const oy = Math.sin(angle) * (baseR * 0.94);
+        nodes.push({ ox, oy, x: center.x + ox, y: center.y + oy, vx: 0, vy: 0 });
+      }
+    }
+    initNodes();
+
+    const STIFFNESS = 0.075;
+    const NEIGHBOR_PULL = 0.14;
+    const DAMPING = 0.87;
+    const MARGIN = 6;
+
+    function nextEmotion(step) {
+      if (typeof step !== 'number') step = 1;
+      currentEmotion = (currentEmotion + step + emotions.length) % emotions.length;
+      nextEmotionTime = Date.now() + 5000 + Math.random() * 4000;
+    }
+
+    function startVape() {
+      if (vape.active || bulbScene.active) return;
+      walker.isWalking = false;
+      vape.active = true;
+      vape.timer = 0;
+      vape.nextAutoTime = Date.now() + 14000 + Math.random() * 10000;
+    }
+
+    function startBulbScene() {
+      if (bulbScene.active) return;
+      vape.active = false;
+      walker.isWalking = false;
+      bulbScene.active = true;
+      bulbScene.timer = 0;
+      bulbScene.ladderVisible = true;
+      bulbScene.bulbState = 'screwing';
+      bulbScene.shards = [];
+      bulbScene.flashAlpha = 0;
+      currentEmotion = 0;
+    }
+
+    function pokeJelly(step) {
+      if (bulbScene.active) return;
+      if (typeof step !== 'number') step = 1;
+      walker.isWalking = false;
+      walker.nextWalkTime = Date.now() + 2500;
+      if (Math.random() < 0.25 && !vape.active) {
+        startVape();
+      } else {
+        nextEmotion(step);
+      }
+      const slideVx = (Math.random() - 0.5) * 14;
+      for (let i = 0; i < NUM_POINTS; i++) {
+        const factor = nodes[i].oy < 0 ? 1.4 : 0.6;
+        nodes[i].vx += slideVx * factor;
+        nodes[i].vy += (nodes[i].oy < 0 ? 3.5 : -1.5);
+      }
+    }
+
+    function setupMediaSession() {}
+
+    // Обработчики гироскопа и акселерометра для HTTPS
+    function handleOrientation(e) {
+      if (!tiltEnabled || e.gamma === null || e.beta === null) return;
+      gravity.x = Math.max(-0.7, Math.min(0.7, e.gamma * 0.018));
+      gravity.y = Math.max(-0.7, Math.min(0.7, (e.beta - 35) * 0.018));
+    }
+
+    function handleMotion(e) {
+      if (!tiltEnabled) return;
+      const pureAcc = e.acceleration;
+      if (pureAcc && (Math.abs(pureAcc.x) > 13 || Math.abs(pureAcc.y) > 13)) {
+        pokeJelly(1);
+      }
+    }
+
+    tiltBtn.addEventListener('click', async () => {
+      if (!tiltEnabled) {
+        try {
+          if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            const permission = await DeviceOrientationEvent.requestPermission();
+            if (permission !== 'granted') {
+              alert('Доступ к гироскопу отклонен. Перезагрузите страницу и нажмите «Разрешить».');
+              return;
+            }
+          }
+          if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            await DeviceMotionEvent.requestPermission();
+          }
+        } catch (err) {
+          alert('Ошибка доступа к датчикам: ' + err.message);
+          return;
+        }
+
+        window.addEventListener('deviceorientation', handleOrientation);
+        window.addEventListener('devicemotion', handleMotion);
+        tiltEnabled = true;
+        walker.isWalking = false;
+        tiltBtn.textContent = 'Гироскоп: ВКЛ';
+        tiltBtn.classList.add('active');
+      } else {
+        tiltEnabled = false;
+        window.removeEventListener('deviceorientation', handleOrientation);
+        window.removeEventListener('devicemotion', handleMotion);
+        gravity = { x: 0, y: 0.42 };
+        tiltBtn.textContent = 'Гироскоп: ВЫКЛ';
+        tiltBtn.classList.remove('active');
+        walker.nextWalkTime = Date.now() + 1500;
+      }
+    });
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
+      const clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
+      return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (bulbScene.active) return;
+      const pos = getPos(e);
+      if (Math.hypot(pos.x - center.x, pos.y - center.y) <= 95) {
+        isDragging = true;
+        walker.isWalking = false;
+        dragMoved = false;
+        lastPointer = { x: pos.x, y: pos.y };
+        for (let n of nodes) {
+          n.vx += (n.x - pos.x) * 0.08;
+          n.vy += (n.y - pos.y) * 0.08;
+        }
+      }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!isDragging || bulbScene.active) return;
+      const pos = getPos(e);
+      const dx = pos.x - lastPointer.x;
+      const dy = pos.y - lastPointer.y;
+      if (Math.hypot(dx, dy) > 3) dragMoved = true;
+
+      for (let n of nodes) {
+        const dist = Math.hypot(n.x - pos.x, n.y - pos.y);
+        const weight = Math.max(0.25, 1 - dist / 165);
+        n.x += dx * weight;
+        n.y += dy * weight;
+        n.vx = dx * 0.75;
+        n.vy = dy * 0.75;
+      }
+      lastPointer = { x: pos.x, y: pos.y };
+    });
+
+    canvas.addEventListener('pointerup', () => {
+      if (isDragging) {
+        if (!dragMoved) pokeJelly(1);
+        isDragging = false;
+        walker.nextWalkTime = Date.now() + 2500;
+      }
+    });
+
+    function moveCharacterTo(tx, ty, speed) {
+      const dx = tx - center.x;
+      const dy = ty - center.y;
+      for (let n of nodes) {
+        n.x += dx * speed;
+        n.y += dy * speed;
+        n.vx = dx * speed * 0.5;
+        n.vy = dy * speed * 0.5;
+      }
+    }
+
+    function updateBulbScene() {
+      bulbScene.timer++;
+      const t = bulbScene.timer;
+
+      if (t <= 55) {
+        moveCharacterTo(240, 200, 0.12);
+      } else if (t > 55 && t <= 110) {
+        moveCharacterTo(240, 115, 0.1);
+      } else if (t > 110 && t <= 170) {
+        const wiggle = Math.sin(t * 0.5) * 6;
+        moveCharacterTo(240 + wiggle, 115, 0.25);
+        if (t === 155) {
+          bulbScene.bulbState = 'lit';
+          currentEmotion = 1;
+        }
+      } else if (t > 170 && t <= 225) {
+        moveCharacterTo(240, 200, 0.11);
+      } else if (t === 226) {
+        bulbScene.ladderVisible = false;
+        currentEmotion = 0;
+      } else if (t === 286) {
+        bulbScene.bulbState = 'broken';
+        bulbScene.flashAlpha = 0.85;
+        currentEmotion = 3;
+        nextEmotionTime = Date.now() + 4500;
+
+        for (let i = 0; i < NUM_POINTS; i++) {
+          nodes[i].vy -= (nodes[i].oy < 0 ? 7 : 3);
+nodes[i].vx += (Math.random() - 0.5) * 10;
+}
+for (let k = 0; k < 14; k++) {
+bulbScene.shards.push({
+x: 240 + (Math.random() - 0.5) * 16,
+y: 44 + (Math.random() - 0.5) * 16,
+vx: (Math.random() - 0.5) * 9,
+vy: (Math.random() - 0.7) * 7,
+size: 3 + Math.random() * 4,
+alpha: 1
+});
+}
+} else if (t > 380) {
+bulbScene.active = false;
+bulbScene.bulbState = 'none';
+walker.nextWalkTime = Date.now() + 2000;
+}
+if (bulbScene.flashAlpha > 0) {
+bulbScene.flashAlpha = Math.max(0, bulbScene.flashAlpha - 0.06);
+}
+}
+function updateSlidingAI() {
+// Если включен гироскоп — отключаем авто-скольжение, чтобы камушек слушался только наклона
+if (isDragging || vape.active || bulbScene.active || tiltEnabled) return;
+const now = Date.now();
+if (!walker.isWalking && now > walker.nextWalkTime) {
+const mid = canvas.width / 2;
+if (center.x < mid) {
+walker.targetX = mid + 20 + Math.random() * (mid - 105);
+} else {
+walker.targetX = 85 + Math.random() * (mid - 105);
+}
+walker.isWalking = true;
+}
+if (walker.isWalking) {
+const distX = walker.targetX - center.x;
+if (Math.abs(distX) < 12) {
+walker.isWalking = false;
+walker.nextWalkTime = now + 2000 + Math.random() * 3000;
+if (Math.random() < 0.45) nextEmotion(1);
+} else {
+if (center.y > canvas.height - 95) {
+const dir = Math.sign(distX);
+const glideSpeed = dir > 0 ? 0.42 : 0.36;
+for (let i = 0; i < NUM_POINTS; i++) {
+const lean = nodes[i].oy < 0 ? 1.15 : 0.9;
+nodes[i].vx += dir * glideSpeed * lean;
+}
+}
+}
+}
+}
+function updateLiquidPhysics() {
+let sumX = 0, sumY = 0, sumVx = 0, sumVy = 0;
+for (let i = 0; i < NUM_POINTS; i++) {
+sumX += nodes[i].x; sumY += nodes[i].y;
+sumVx += nodes[i].vx; sumVy += nodes[i].vy;
+}
+center.x = sumX / NUM_POINTS; center.y = sumY / NUM_POINTS;
+center.vx = sumVx / NUM_POINTS; center.vy = sumVy / NUM_POINTS;
+if (isNaN(center.x) || isNaN(center.y)) {
+center.x = 240; center.y = 155;
+initNodes();
+return;
+}
+const disableGravity = isDragging || (bulbScene.active && bulbScene.timer <= 225);
+for (let i = 0; i < NUM_POINTS; i++) {
+let n = nodes[i];
+let prev = nodes[(i - 1 + NUM_POINTS) % NUM_POINTS];
+let next = nodes[(i + 1) % NUM_POINTS];
+if (!disableGravity) {
+n.vx += gravity.x;
+n.vy += gravity.y;
+}
+n.vx += (center.x + n.ox - n.x) * STIFFNESS;
+n.vy += (center.y + n.oy - n.y) * STIFFNESS;
+n.vx += ((prev.x + next.x) * 0.5 - n.x) * NEIGHBOR_PULL;
+n.vy += ((prev.y + next.y) * 0.5 - n.y) * NEIGHBOR_PULL;
+n.vx *= DAMPING;
+n.vy *= DAMPING;
+n.x += n.vx;
+n.y += n.vy;
+if (n.y > canvas.height - MARGIN) {
+if (n.vy > 11 && !bulbScene.active) nextEmotion(1);
+n.y = canvas.height - MARGIN;
+n.vy = -n.vy * 0.25;
+n.vx *= (walker.isWalking || tiltEnabled) ? 0.94 : 0.82;
+}
+if (n.y < MARGIN) {
+n.y = MARGIN;
+n.vy = -n.vy * 0.45;
+}
+if (n.x > canvas.width - MARGIN) {
+n.x = canvas.width - MARGIN;
+n.vx = -n.vx * 0.45;
+n.vy *= 0.85;
+}
+if (n.x < MARGIN) {
+n.x = MARGIN;
+n.vx = -n.vx * 0.45;
+n.vy *= 0.85;
+}
+}
+}
+function drawLadder() {
+if (!bulbScene.ladderVisible) return;
+ctx.save();
+ctx.strokeStyle = '#a1a1aa';
+ctx.lineWidth = 5;
+ctx.lineCap = 'round';
+ctx.beginPath();
+ctx.moveTo(212, 264); ctx.lineTo(222, 105);
+ctx.moveTo(268, 264); ctx.lineTo(258, 105);
+ctx.stroke();
+ctx.lineWidth = 4;
+for (let y = 125; y <= 245; y += 30) {
+const ratio = (y - 105) / (264 - 105);
+const halfW = 18 + ratio * 10;
+ctx.beginPath();
+ctx.moveTo(240 - halfW, y);
+ctx.lineTo(240 + halfW, y);
+ctx.stroke();
+}
+ctx.restore();
+}
+function drawBulbAndSocket() {
+if (!bulbScene.active) return;
+ctx.save();
+ctx.strokeStyle = '#111214';
+ctx.lineWidth = 4;
+ctx.beginPath();
+ctx.moveTo(240, 0); ctx.lineTo(240, 18);
+ctx.stroke();
+ctx.fillStyle = '#3f424a';
+ctx.strokeStyle = '#111214';
+ctx.lineWidth = 2.5;
+ctx.beginPath();
+ctx.roundRect(231, 16, 18, 14, 3);
+ctx.fill(); ctx.stroke();
+if (bulbScene.bulbState === 'screwing' || bulbScene.bulbState === 'lit') {
+const isLit = bulbScene.bulbState === 'lit';
+if (isLit) {
+const glow = ctx.createRadialGradient(240, 44, 4, 240, 44, 150);
+glow.addColorStop(0, 'rgba(253, 224, 71, 0.55)');
+glow.addColorStop(0.5, 'rgba(253, 224, 71, 0.15)');
+glow.addColorStop(1, 'rgba(253, 224, 71, 0)');
+ctx.fillStyle = glow;
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+ctx.fillStyle = isLit ? '#fef08a' : 'rgba(228, 228, 231, 0.35)';
+ctx.strokeStyle = '#111214';
+ctx.lineWidth = 2.5;
+ctx.beginPath();
+ctx.arc(240, 44, 14, 0, Math.PI * 2);
+ctx.fill(); ctx.stroke();
+} else if (bulbScene.bulbState === 'broken') {
+ctx.strokeStyle = '#e4e4e7';
+ctx.lineWidth = 2;
+ctx.beginPath();
+ctx.moveTo(234, 30); ctx.lineTo(236, 37); ctx.lineTo(240, 32); ctx.lineTo(244, 38); ctx.lineTo(246, 30);
+ctx.stroke();
+}
+for (let i = bulbScene.shards.length - 1; i >= 0; i--) {
+let s = bulbScene.shards[i];
+s.x += s.vx; s.y += s.vy; s.vy += 0.35; s.alpha -= 0.02;
+if (s.alpha <= 0) {
+bulbScene.shards.splice(i, 1);
+continue;
+}
+ctx.fillStyle = 'rgba(254, 240, 138, ' + s.alpha.toFixed(2) + ')';
+ctx.fillRect(s.x, s.y, s.size, s.size);
+}
+if (bulbScene.flashAlpha > 0) {
+ctx.fillStyle = 'rgba(255, 255, 255, ' + bulbScene.flashAlpha.toFixed(2) + ')';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+ctx.restore();
+}
+function drawLiquidBody() {
+ctx.beginPath();
+for (let i = 0; i < NUM_POINTS; i++) {
+let curr = nodes[i];
+let next = nodes[(i + 1) % NUM_POINTS];
+let midX = (curr.x + next.x) * 0.5;
+let midY = (curr.y + next.y) * 0.5;
+if (i === 0) {
+let prev = nodes[NUM_POINTS - 1];
+ctx.moveTo((prev.x + curr.x) * 0.5, (prev.y + curr.y) * 0.5);
+}
+ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
+}
+ctx.closePath();
+}
+function spawnVapor(mouthX, mouthY) {
+for (let k = 0; k < 2; k++) {
+vaporParticles.push({
+x: mouthX + (Math.random() - 0.5) * 10,
+y: mouthY + (Math.random() - 0.5) * 4,
+vx: -1.0 - Math.random() * 1.8 + center.vx * 0.15,
+vy: -1.0 - Math.random() * 1.4,
+r: 6 + Math.random() * 7,
+alpha: 0.65 + Math.random() * 0.2
+});
+}
+}
+function updateAndDrawVapor() {
+for (let i = vaporParticles.length - 1; i >= 0; i--) {
+let p = vaporParticles[i];
+p.x += p.vx; p.y += p.vy; p.vx *= 0.97; p.vy -= 0.012; p.r += 0.55; p.alpha -= 0.0085;
+if (p.alpha <= 0) {
+vaporParticles.splice(i, 1);
+continue;
+}
+ctx.save();
+const grad = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, p.r);
+grad.addColorStop(0, 'rgba(240, 244, 248, ' + p.alpha.toFixed(2) + ')');
+grad.addColorStop(0.5, 'rgba(235, 240, 245, ' + (p.alpha * 0.5).toFixed(2) + ')');
+grad.addColorStop(1, 'rgba(240, 244, 248, 0)');
+ctx.fillStyle = grad;
+ctx.beginPath();
+ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+ctx.fill();
+ctx.restore();
+}
+}
+let frame = 0;
+function drawCharacter() {
+if (bulbScene.active) {
+updateBulbScene();
+} else {
+updateSlidingAI();
+}
+updateLiquidPhysics();
+const now = Date.now();
+if (!bulbScene.active && !vape.active && !isDragging && now > nextEmotionTime) {
+nextEmotion(1);
+}
+if (!bulbScene.active && !vape.active && !isDragging && !walker.isWalking && now > vape.nextAutoTime) {
+startVape();
+}
+ctx.fillStyle = '#232529';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+drawLadder();
+drawLiquidBody();
+ctx.fillStyle = '#757982';
+ctx.fill();
+ctx.save();
+ctx.clip();
+ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+ctx.beginPath();
+ctx.ellipse(center.x - 22, center.y - 30, 22, 11, -0.4, 0, Math.PI * 2);
+ctx.fill();
+ctx.restore();
+drawLiquidBody();
+ctx.lineWidth = 6.5;
+ctx.strokeStyle = '#111214';
+ctx.lineJoin = 'round';
+ctx.stroke();
+const lookX = Math.max(-11, Math.min(11, center.vx * 1.4));
+const lookY = Math.max(-9, Math.min(9, center.vy * 0.65));
+const fx = center.x + lookX;
+const fy = center.y + lookY;
+const emo = emotions[currentEmotion];
+const isBlinking = (frame % 170) > 162 && emo !== 'surprised';
+ctx.fillStyle = '#c93b3b';
+ctx.beginPath();
+ctx.ellipse(fx + 13, fy + 4, 8, 5.5, 0.2, 0, Math.PI * 2);
+ctx.fill();
+function drawCartoonEyes(pupilOffsetY, leftClosed, rightClosed) {
+ctx.fillStyle = '#ffffff';
+ctx.strokeStyle = '#111214';
+ctx.lineWidth = 3;
+ctx.beginPath();
+ctx.ellipse(fx - 16, fy - 17, 12, leftClosed ? 2 : 17, -0.05, 0, Math.PI * 2);
+ctx.fill(); ctx.stroke();
+ctx.beginPath();
+ctx.ellipse(fx + 10, fy - 15, 12, rightClosed ? 2 : 17, 0.05, 0, Math.PI * 2);
+ctx.fill(); ctx.stroke();
+ctx.fillStyle = '#111214';
+if (!leftClosed) {
+ctx.beginPath();
+ctx.arc(fx - 16 + lookX * 0.3, fy - 17 + pupilOffsetY, 4.8, 0, Math.PI * 2);
+ctx.fill();
+}
+if (!rightClosed) {
+ctx.beginPath();
+ctx.arc(fx + 10 + lookX * 0.3, fy - 15 + pupilOffsetY, 4.8, 0, Math.PI * 2);
+ctx.fill();
+}
+}
+ctx.strokeStyle = '#111214';
+ctx.lineWidth = 6;
+ctx.lineCap = 'round';
+if (vape.active) {
+vape.timer++;
+const isInhaling = vape.timer < 85;
+const isExhaling = vape.timer >= 85 && vape.timer < 175;
+drawCartoonEyes(2.5, isInhaling, false);
+ctx.fillStyle = '#111214';
+ctx.beginPath();
+ctx.arc(fx - 15, fy + 22, isExhaling ? 7 : 5, 0, Math.PI * 2);
+ctx.fill();
+let slideOffset = 0;
+if (vape.timer < 20) slideOffset = (20 - vape.timer) * 3;
+if (vape.timer > 180) slideOffset = (vape.timer - 180) * 3;
+ctx.save();
+ctx.translate(fx - 32 - slideOffset, fy + 28 + slideOffset * 0.5);
+ctx.rotate(-0.45);
+ctx.fillStyle = '#2b2d33';
+ctx.strokeStyle = '#111214';
+ctx.lineWidth = 3;
+ctx.beginPath();
+ctx.roundRect(-30, -6, 32, 12, 5);
+ctx.fill(); ctx.stroke();
+ctx.fillStyle = '#111214';
+ctx.fillRect(0, -4.5, 8, 9);
+ctx.fillStyle = isInhaling ? '#38bdf8' : '#525660';
+ctx.beginPath();
+ctx.arc(-22, 0, 2.5, 0, Math.PI * 2);
+ctx.fill();
+ctx.restore();
+if (isExhaling && vape.timer % 2 === 0) {
+spawnVapor(fx - 18, fy + 20);
+}
+if (vape.timer >= vape.duration) {
+vape.active = false;
+walker.nextWalkTime = Date.now() + 2000;
+}
+} else {
+const bulbLookOffset = (bulbScene.active && bulbScene.timer > 110 && bulbScene.timer < 295) ? -4.5 : 0;
+if (emo === 'classic') {
+drawCartoonEyes(bulbLookOffset, isBlinking, isBlinking);
+ctx.beginPath(); ctx.moveTo(fx - 30, fy + 18); ctx.lineTo(fx + 18, fy + 26); ctx.stroke();
+} else if (emo === 'happy') {
+drawCartoonEyes(-2.5 + bulbLookOffset, isBlinking, isBlinking);
+ctx.beginPath(); ctx.arc(fx - 5, fy + 16, 19, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+} else if (emo === 'sad') {
+drawCartoonEyes(3.5, isBlinking, isBlinking);
+ctx.beginPath(); ctx.arc(fx - 5, fy + 35, 17, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
+} else if (emo === 'surprised') {
+drawCartoonEyes(bulbLookOffset, false, false);
+ctx.fillStyle = '#111214';
+ctx.beginPath(); ctx.ellipse(fx - 5, fy + 25, 9, 11, 0, 0, Math.PI * 2); ctx.fill();
+}
+}
+drawBulbAndSocket();
+updateAndDrawVapor();
+frame++;
+requestAnimationFrame(drawCharacter);
+}
+drawCharacter();
+const stream = canvas.captureStream(30);
+video.srcObject = stream;
+btn.addEventListener('click', async () => {
+try {
+await video.play();
+setupMediaSession();
+if (video.webkitSupportsPresentationMode && typeof video.webkitSetPresentationMode === "function") {
+video.webkitSetPresentationMode(video.webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture");
+} else if (document.pictureInPictureEnabled) {
+await video.requestPictureInPicture();
+}
+} catch (err) {
+        alert('Ошибка запуска окна: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>
