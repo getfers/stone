@@ -465,6 +465,7 @@ ctx.beginPath(); ctx.ellipse(fx - 5 * s, fy + 25 * s, 9 * s, 11 * s, 0, 0, Math.
 }
 drawBlocks();
 drawBulbAndSocket();
+  drawFightScene();
 updateAndDrawVapor();
 frame++;
 requestAnimationFrame(drawCharacter);
@@ -481,6 +482,6 @@ video.webkitSetPresentationMode(video.webkitPresentationMode === "picture-in-pic
 await video.requestPictureInPicture();
 }
 } catch (err) {
-lert('Ошибка запуска окна: ' + err.message);
+alert('Ошибка запуска окна: ' + err.message);
 }
 });
