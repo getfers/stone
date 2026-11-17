@@ -1080,12 +1080,28 @@ ctx.fillText('7', 0, 7);
 ctx.restore();
 }
 function drawDrinkScene(fx, fy, s) {
-if (!drinkScene.active) return;
-const t = drinkScene.timer;
-let slideOffset = 0;
-if (t < 20) slideOffset = (20 - t) * 4;
-if (t > 165) slideOffset = (t - 165) * 4;
-let tiltAngle = 0.25;
-let drinkLiftY = 36;
-if (t >= 20 && t <= 155) {
-tiltAngle = 0.72 + Math.sin(t * 0.25) * 0.08;
+  if (!drinkScene.active) return;
+  const t = drinkScene.timer;
+
+  let slideOffset = 0;
+  if (t < 20) slideOffset = (20 - t) * 4;
+  if (t > 165) slideOffset = (t - 165) * 4;
+
+  let tiltAngle = 0.25;
+  let drinkLiftY = 36;
+  if (t >= 20 && t <= 155) {
+    tiltAngle = 0.72 + Math.sin(t * 0.25) * 0.08;
+    drinkLiftY = 44;
+  }
+
+  const progress = Math.max(0, Math.min(1, (t - 25) / 130));
+  const liquidLevel = 0.85 - progress * 0.55;
+
+  drawWhiskeyBottle(
+    fx - (34 + slideOffset) * s,
+    fy + (drinkLiftY + slideOffset * 0.5) * s,
+    tiltAngle,
+    s,
+    liquidLevel
+  );
+}
