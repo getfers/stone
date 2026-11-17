@@ -922,20 +922,23 @@ function drawDrinkScene(fx, fy, s) {
   if (t > 165) slideOffset = (t - 165) * 4;
 
   // Угол наклона бутылки ко рту (запрокидывается во время глотков)
-  let tiltAngle = -0.35;
+   let tiltAngle = 0.2;
+  let drinkLiftY = 0;
   if (t >= 20 && t <= 155) {
-    tiltAngle = -1.85 + Math.sin(t * 0.25) * 0.12;
+    tiltAngle = 1.15 + Math.sin(t * 0.25) * 0.1;
+    drinkLiftY = -14;
   }
+
 
   // Уровень жидкости уменьшается во время питья
   const progress = Math.max(0, Math.min(1, (t - 25) / 130));
   const liquidLevel = 0.85 - progress * 0.55;
 
-  drawWhiskeyBottle(
-    fx - (26 + slideOffset) * s,
-    fy + (16 + slideOffset * 0.5) * s,
+   drawWhiskeyBottle(
+    fx - (34 + slideOffset) * s,
+    fy + (18 + drinkLiftY + slideOffset * 0.5) * s,
     tiltAngle,
     s,
     liquidLevel
   );
-}
+
