@@ -31,10 +31,9 @@ function initNodes(customScale) {
   for (let i = 0; i < NUM_POINTS; i++) {
     const angle = (i / NUM_POINTS) * Math.PI * 2;
     let baseR = 62 * s;
-    if (Math.sin(angle) > 0) baseR += Math.sin(angle) * 9 * s;
-    if (Math.cos(angle) < 0 && Math.sin(angle) > 0) baseR += 4 * s;
+    if (Math.sin(angle) > 0) baseR += Math.sin(angle) * 6 * s;
     const ox = Math.cos(angle) * baseR;
-    const oy = Math.sin(angle) * (baseR * 0.94);
+    const oy = Math.sin(angle) * (baseR * 0.96);
     nodes.push({ ox, oy, x: center.x + ox, y: center.y + oy, vx: 0, vy: 0 });
   }
 }
@@ -44,10 +43,9 @@ function updateNodeScale(s) {
   for (let i = 0; i < NUM_POINTS; i++) {
     const angle = (i / NUM_POINTS) * Math.PI * 2;
     let baseR = 62 * s;
-    if (Math.sin(angle) > 0) baseR += Math.sin(angle) * 9 * s;
-    if (Math.cos(angle) < 0 && Math.sin(angle) > 0) baseR += 4 * s;
+    if (Math.sin(angle) > 0) baseR += Math.sin(angle) * 6 * s;
     nodes[i].ox = Math.cos(angle) * baseR;
-    nodes[i].oy = Math.sin(angle) * (baseR * 0.94);
+    nodes[i].oy = Math.sin(angle) * (baseR * 0.96);
   }
 }
 
@@ -133,7 +131,7 @@ function getPos(e) {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
-  if (bulbScene.active || blocksScene.active || slideScene.active || life.state === 'dying') return;
+  if (bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || life.state === 'dying') return;
   const pos = getPos(e);
   if (Math.hypot(pos.x - center.x, pos.y - center.y) <= 95 * life.scale + 15) {
     isDragging = true;
@@ -148,7 +146,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
-  if (!isDragging || bulbScene.active || blocksScene.active || slideScene.active || life.state === 'dying') return;
+  if (!isDragging || bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || life.state === 'dying') return;
   const pos = getPos(e);
   const dx = pos.x - lastPointer.x;
   const dy = pos.y - lastPointer.y;
@@ -265,7 +263,7 @@ function updateLiquidPhysics() {
       if (n.vy > 11 && !isAnySceneActive()) nextEmotion(1);
       n.y = canvas.height - MARGIN;
       n.vy = -n.vy * 0.25;
-      n.vx *= (walker.isWalking || tiltEnabled || blocksScene.active || slideScene.active) ? 0.94 : 0.82;
+      n.vx *= (walker.isWalking || tiltEnabled || blocksScene.active || slideScene.active || fightScene.active) ? 0.94 : 0.82;
     }
     if (n.y < MARGIN) { n.y = MARGIN; n.vy = -n.vy * 0.45; }
     if (n.x > canvas.width - MARGIN) { n.x = canvas.width - MARGIN; n.vx = -n.vx * 0.45; n.vy *= 0.85; }
@@ -309,8 +307,8 @@ function drawCharacter() {
 
   if (bulbScene.active) updateBulbScene();
   else if (blocksScene.active) updateBlocksScene();
-else if (slideScene.active) updateSlideScene();
-  else if (fightScene.active) updateFightScene();
+  else if (slideScene.active) updateSlideScene();
+else if (fightScene.active) updateFightScene();
 else updateSlidingAI();
 updateLiquidPhysics();
 const now = Date.now();
@@ -329,74 +327,20 @@ return;
 }
 const s = life.scale;
 const shiverX = vape.blueLevel > 0.65 ? (Math.random() - 0.5) * 3 : 0;
-const costume = costumes[currentCostume];
-drawBatmanCape(ctx, center, s, frame);
+// Гладкое белое 3D-тело без грубой черной обводки
 drawLiquidBody();
 ctx.fillStyle = getBodyColor(vape.blueLevel);
 ctx.fill();
-ctx.save();
-ctx.clip();
-ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-ctx.beginPath();
-ctx.ellipse(center.x - 22 * s, center.y - 30 * s, 22 * s, 11 * s, -0.4, 0, Math.PI * 2);
-ctx.fill();
-ctx.restore();
 const lookX = Math.max(-11 * s, Math.min(11 * s, center.vx * 1.4)) + shiverX;
 const lookY = Math.max(-9 * s, Math.min(9 * s, center.vy * 0.65));
 const fx = center.x + lookX;
 const fy = center.y + lookY;
-drawCostumeDetails(ctx, center, fx, fy, s, drawLiquidBody);
-drawLiquidBody();
-ctx.lineWidth = Math.max(3.5, 6.5 * s);
-ctx.strokeStyle = '#111214';
-ctx.lineJoin = 'round';
-ctx.stroke();
+// Объёмная светотень и углубления под глаза
+drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody);
 const emo = emotions[currentEmotion];
 const isBlinking = (frame % 170) > 162 && emo !== 'surprised';
-if (costume === 'joker') {
-ctx.fillStyle = 'rgba(24, 24, 27, 0.65)';
-ctx.beginPath();
-ctx.ellipse(fx - 16 * s, fy - 17 * s, 15 * s, 20 * s, -0.05, 0, Math.PI * 2);
-ctx.ellipse(fx + 10 * s, fy - 15 * s, 15 * s, 20 * s, 0.05, 0, Math.PI * 2);
-ctx.fill();
-} else if (costume !== 'batman' && costume !== 'myers') {
-ctx.fillStyle = '#c93b3b';
-ctx.beginPath();
-ctx.ellipse(fx + 13 * s, fy + 4 * s, 8 * s, 5.5 * s, 0.2, 0, Math.PI * 2);
-ctx.fill();
-}
-function drawCartoonEyes(pupilOffsetY, leftClosed, rightClosed) {
-ctx.fillStyle = '#ffffff';
-ctx.strokeStyle = '#111214';
-ctx.lineWidth = Math.max(1.8, 3 * s);
-ctx.beginPath();
-ctx.ellipse(fx - 16 * s, fy - 17 * s, 12 * s, (leftClosed ? 2 : 17) * s, -0.05, 0, Math.PI * 2);
-ctx.fill(); ctx.stroke();
-ctx.beginPath();
-ctx.ellipse(fx + 10 * s, fy - 15 * s, 12 * s, (rightClosed ? 2 : 17) * s, 0.05, 0, Math.PI * 2);
-ctx.fill(); ctx.stroke();
-if (costume === 'myers') {
-ctx.fillStyle = '#111214';
-ctx.beginPath();
-ctx.ellipse(fx - 16 * s, fy - 17 * s, 10 * s, (leftClosed ? 2 : 14) * s, -0.05, 0, Math.PI * 2);
-ctx.ellipse(fx + 10 * s, fy - 15 * s, 10 * s, (rightClosed ? 2 : 14) * s, 0.05, 0, Math.PI * 2);
-ctx.fill();
-} else if (costume !== 'batman') {
-ctx.fillStyle = '#111214';
-if (!leftClosed) {
-ctx.beginPath();
-ctx.arc(fx - 16 * s + lookX * 0.3, fy - 17 * s + pupilOffsetY * s, 4.8 * s, 0, Math.PI * 2);
-ctx.fill();
-}
-if (!rightClosed) {
-ctx.beginPath();
-ctx.arc(fx + 10 * s + lookX * 0.3, fy - 15 * s + pupilOffsetY * s, 4.8 * s, 0, Math.PI * 2);
-ctx.fill();
-}
-}
-}
-ctx.strokeStyle = costume === 'joker' ? '#dc2626' : '#111214';
-ctx.lineWidth = Math.max(3, 6 * s);
+ctx.strokeStyle = 'rgba(24, 24, 27, 0.75)';
+ctx.lineWidth = Math.max(2.5, 4.5 * s);
 ctx.lineCap = 'round';
 if (vape.active) {
 vape.timer++;
@@ -411,16 +355,16 @@ requestAnimationFrame(drawCharacter);
 return;
 }
 }
-drawCartoonEyes(2.5, isInhaling, false);
-ctx.fillStyle = costume === 'joker' ? '#dc2626' : '#111214';
+drawGlossyEyes(ctx, fx, fy, s, lookX, 2.5, isInhaling, false);
+ctx.fillStyle = '#18181b';
 ctx.beginPath();
-ctx.arc(fx - 15 * s, fy + 22 * s, (isExhaling ? 7 : 5) * s, 0, Math.PI * 2);
+ctx.arc(fx - 12 * s, fy + 26 * s, (isExhaling ? 6.5 : 4.5) * s, 0, Math.PI * 2);
 ctx.fill();
 let slideOffset = 0;
 if (vape.timer < 20) slideOffset = (20 - vape.timer) * 3;
 if (vape.timer > 180) slideOffset = (vape.timer - 180) * 3;
 ctx.save();
-ctx.translate(fx - (32 + slideOffset) * s, fy + (28 + slideOffset * 0.5) * s);
+ctx.translate(fx - (30 + slideOffset) * s, fy + (31 + slideOffset * 0.5) * s);
 ctx.rotate(-0.45);
 ctx.scale(s, s);
 ctx.fillStyle = '#2b2d33';
@@ -436,36 +380,30 @@ ctx.beginPath();
 ctx.arc(-22, 0, 2.5, 0, Math.PI * 2);
 ctx.fill();
 ctx.restore();
-if (isExhaling && vape.timer % 2 === 0) spawnVapor(fx - 18 * s, fy + 20 * s);
+if (isExhaling && vape.timer % 2 === 0) spawnVapor(fx - 15 * s, fy + 24 * s);
 if (vape.timer >= vape.duration) {
 vape.active = false;
 walker.nextWalkTime = Date.now() + 2000;
 }
 } else {
 const bulbLookOffset = (bulbScene.active && bulbScene.timer > 110 && bulbScene.timer < 295) ? -4.5 : 0;
-if (costume === 'joker' && emo !== 'surprised') {
-drawCartoonEyes(bulbLookOffset, isBlinking, isBlinking);
-ctx.beginPath();
-ctx.arc(fx - 4 * s, fy + 10 * s, 25 * s, 0.08 * Math.PI, 0.92 * Math.PI);
-ctx.stroke();
-} else if (emo === 'classic') {
-drawCartoonEyes(bulbLookOffset, isBlinking, isBlinking);
-ctx.beginPath(); ctx.moveTo(fx - 30 * s, fy + 18 * s); ctx.lineTo(fx + 18 * s, fy + 26 * s); ctx.stroke();
+if (emo === 'classic') {
+drawGlossyEyes(ctx, fx, fy, s, lookX, bulbLookOffset, isBlinking, isBlinking);
 } else if (emo === 'happy') {
-drawCartoonEyes(-2.5 + bulbLookOffset, isBlinking, isBlinking);
-ctx.beginPath(); ctx.arc(fx - 5 * s, fy + 16 * s, 19 * s, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+drawGlossyEyes(ctx, fx, fy, s, lookX, -2.5 + bulbLookOffset, isBlinking, isBlinking);
+ctx.beginPath(); ctx.arc(fx, fy + 22 * s, 13 * s, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
 } else if (emo === 'sad') {
-drawCartoonEyes(3.5, isBlinking, isBlinking);
-ctx.beginPath(); ctx.arc(fx - 5 * s, fy + 35 * s, 17 * s, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
+drawGlossyEyes(ctx, fx, fy, s, lookX, 3.5, isBlinking, isBlinking);
+ctx.beginPath(); ctx.arc(fx, fy + 36 * s, 12 * s, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
 } else if (emo === 'surprised') {
-drawCartoonEyes(bulbLookOffset, false, false);
-ctx.fillStyle = costume === 'joker' ? '#dc2626' : '#111214';
-ctx.beginPath(); ctx.ellipse(fx - 5 * s, fy + 25 * s, 9 * s, 11 * s, 0, 0, Math.PI * 2); ctx.fill();
+drawGlossyEyes(ctx, fx, fy, s, lookX, bulbLookOffset, false, false);
+ctx.fillStyle = '#18181b';
+ctx.beginPath(); ctx.ellipse(fx, fy + 26 * s, 7 * s, 9 * s, 0, 0, Math.PI * 2); ctx.fill();
 }
 }
 drawBlocks();
 drawBulbAndSocket();
-  drawFightScene();
+drawFightScene();
 updateAndDrawVapor();
 frame++;
 requestAnimationFrame(drawCharacter);
