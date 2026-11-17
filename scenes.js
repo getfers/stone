@@ -757,6 +757,7 @@ b.vy = -b.vy * 0.35;
 }
 }
 }
+
 if (blocksScene.phase === 'falling') {
 if (blocksScene.timer > 65) {
 blocksScene.phase = 'collecting';
