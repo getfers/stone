@@ -658,17 +658,72 @@ frame++;
 requestAnimationFrame(drawCharacter);
 }
 drawCharacter();
+const stage = document.getElementById('stage');
 const stream = canvas.captureStream(30);
 video.srcObject = stream;
+let docPipWindow = null;
+
 btn.addEventListener('click', async () => {
-try {
-await video.play();
-if (video.webkitSupportsPresentationMode && typeof video.webkitSetPresentationMode === "function") {
-video.webkitSetPresentationMode(video.webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture");
-} else if (document.pictureInPictureEnabled) {
-await video.requestPictureInPicture();
-}
-} catch (err) {
-alert('PiP error: ' + err.message);
-}
+  try {
+    // 1. Для ПК (Chrome / Edge / Яндекс): открываем живое интерактивное окно поверх всех окон
+    if ('documentPictureInPicture' in window && !/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      if (docPipWindow && !docPipWindow.closed) {
+        docPipWindow.close();
+        return;
+      }
+
+      docPipWindow = await window.documentPictureInPicture.requestWindow({
+        width: 480,
+        height: 270
+      });
+
+      // Стили для живого плавающего окна на ПК
+      const pipStyle = docPipWindow.document.createElement('style');
+      pipStyle.textContent = `
+        html, body {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
+          background: #232529;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          user-select: none;
+        }
+        canvas {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          touch-action: none;
+          cursor: grab;
+        }
+        canvas:active {
+          cursor: grabbing;
+        }
+      `;
+      docPipWindow.document.head.appendChild(pipStyle);
+
+      // Переносим живой холст в плавающее окно
+      docPipWindow.document.body.appendChild(canvas);
+
+      // Возвращаем холст обратно на страницу при закрытии окна
+      docPipWindow.addEventListener('pagehide', () => {
+        stage.appendChild(canvas);
+        docPipWindow = null;
+      });
+      return;
+    }
+
+    // 2. Для iPhone (Safari): всё работает как раньше через видеопоток
+    await video.play();
+    if (video.webkitSupportsPresentationMode && typeof video.webkitSetPresentationMode === "function") {
+      video.webkitSetPresentationMode(video.webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture");
+    } else if (document.pictureInPictureEnabled) {
+      await video.requestPictureInPicture();
+    }
+  } catch (err) {
+    alert('PiP error: ' + err.message);
+  }
 });
