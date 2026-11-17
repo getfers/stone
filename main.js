@@ -97,39 +97,40 @@ const pureAcc = e.acceleration;
 if (pureAcc && (Math.abs(pureAcc.x) > 13 || Math.abs(pureAcc.y) > 13)) pokeJelly(1);
 }
 tiltBtn.addEventListener('click', async () => {
-resetIdleTimer();
-if (!tiltEnabled) {
-try {
-if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-const permission = await DeviceOrientationEvent.requestPermission();
-if (permission !== 'granted') {
-alert('Доступ к гироскопу отклонен. Перезагрузите страницу и нажмите «Разрешить».');
-return;
-}
-}
-if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-await DeviceMotionEvent.requestPermission();
-}
-} catch (err) {
-alert('Ошибка доступа к датчикам: ' + err.message);
-return;
-}
-window.addEventListener('deviceorientation', handleOrientation);
-window.addEventListener('devicemotion', handleMotion);
-tiltEnabled = true;
-walker.isWalking = false;
-tiltBtn.textContent = 'Гироскоп: ВКЛ';
-tiltBtn.classList.add('active');
-} else {
-tiltEnabled = false;
-sushiGame.active = false;
-window.removeEventListener('deviceorientation', handleOrientation);
-window.removeEventListener('devicemotion', handleMotion);
-gravity = { x: 0, y: 0.42 };
-tiltBtn.textContent = 'Гироскоп: ВЫКЛ';
-tiltBtn.classList.remove('active');
-walker.nextWalkTime = Date.now() + 1500;
-}
+  resetIdleTimer();
+  if (!tiltEnabled) {
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const permission = await DeviceOrientationEvent.requestPermission();
+        if (permission !== 'granted') {
+          alert('Доступ к гироскопу отклонен. Перезагрузите страницу и разрешите доступ.');
+          return;
+        }
+      }
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        await DeviceMotionEvent.requestPermission();
+      }
+    } catch (err) {
+      alert('Ошибка доступа к датчикам: ' + err.message);
+      return;
+    }
+
+    window.addEventListener('deviceorientation', handleOrientation);
+    window.addEventListener('devicemotion', handleMotion);
+    tiltEnabled = true;
+    walker.isWalking = false;
+    tiltBtn.textContent = 'Гироскоп: ВКЛ';
+    tiltBtn.classList.add('active');
+  } else {
+    tiltEnabled = false;
+    sushiGame.active = false;
+    window.removeEventListener('deviceorientation', handleOrientation);
+    window.removeEventListener('devicemotion', handleMotion);
+    gravity = { x: 0, y: 0.42 };
+    tiltBtn.textContent = 'Гироскоп: ВЫКЛ';
+    tiltBtn.classList.remove('active');
+    walker.nextWalkTime = Date.now() + 1500;
+  }
 });
 document.querySelectorAll('button').forEach(b => {
 b.addEventListener('click', resetIdleTimer);
