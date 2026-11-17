@@ -5,22 +5,17 @@ let life = { state: 'alive', timer: 0, scale: 1, ghostY: 0, ghostAlpha: 0 };
 let bulbScene = { active: false, timer: 0, ladderVisible: false, bulbState: 'none', shards: [], flashAlpha: 0 };
 let blocksScene = { active: false, timer: 0, phase: 'falling', currentIdx: 0, blocks: [], shapeType: 0 };
 let slideScene = { active: false, phase: 'approach', timer: 0, progress: 0, speed: 0 };
+let drinkScene = { active: false, timer: 0, duration: 190 };
 
-let drinkScene = {
-  active: false,
-  timer: 0,
-  duration: 190
-};
-
-function isAnySceneActive() {
-  return vape.active || bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || drinkScene.active || life.state !== 'alive';
-}
+// Новые сценки: поедание роллов палочками и игра на гироскопе
+let sushiScene = { active: false, timer: 0, duration: 175, eaten: false };
+let sushiGame = { active: false, rolls: [], caught: 0, total: 5, winTimer: 0 };
 
 let fightScene = {
   active: false,
   timer: 0,
-  phase: 'intro', // 'intro', 'fighting', 'outro'
-  enemy: { x: 420, y: 180, vx: 0, vy: 0, hp: 100, swordAngle: -0.6 },
+  phase: 'intro',
+  enemy: { x: 420, y: 185, vx: 0, vy: 0, hp: 100, swordAngle: -0.6 },
   playerHp: 100,
   playerSwordAngle: 0.6,
   slashes: [],
@@ -29,7 +24,7 @@ let fightScene = {
 };
 
 function isAnySceneActive() {
-  return vape.active || bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || life.state !== 'alive';
+  return vape.active || bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || drinkScene.active || sushiScene.active || sushiGame.active || life.state !== 'alive';
 }
 
 function startVape() {
@@ -47,6 +42,9 @@ function triggerDeath() {
   blocksScene.active = false;
   slideScene.active = false;
   fightScene.active = false;
+  drinkScene.active = false;
+  sushiScene.active = false;
+  sushiGame.active = false;
   isDragging = false;
   life.state = 'dying';
   life.timer = 0;
@@ -119,7 +117,226 @@ function startSlideScene() {
   currentEmotion = 0;
 }
 
-// --- ЗАПУСК И ЛОГИКА БОЯ (SHADOW FIGHT С КАТАНАМИ) ---
+// --- ОТРИСОВКА ОДНОГО РОЛЛА «ФИЛАДЕЛЬФИЯ» ---
+function drawRollIcon(x, y, s, angle) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle || 0);
+  ctx.scale(s, s);
+
+  // Лосось сверху и по бокам
+  ctx.fillStyle = '#fb7185';
+  ctx.strokeStyle = '#111214';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(-12, -9, 24, 18, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  // Белый рис внутри
+  ctx.fillStyle = '#f8fafc';
+  ctx.beginPath();
+  ctx.roundRect(-9, -6, 18, 12, 4);
+  ctx.fill();
+
+  // Нори и начинка (огурец + авокадо)
+  ctx.fillStyle = '#14532d';
+  ctx.beginPath();
+  ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#4ade80';
+  ctx.beginPath();
+  ctx.arc(-1, -1, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// --- 1. СЦЕНКА ПОЕДАНИЯ РОЛЛОВ ПАЛОЧКАМИ ---
+function startSushiScene() {
+  if (isAnySceneActive()) return;
+  walker.isWalking = false;
+  sushiScene.active = true;
+  sushiScene.timer = 0;
+  sushiScene.eaten = false;
+  currentEmotion = 3; // Удивляется вкусному роллу
+}
+
+function updateSushiScene() {
+  sushiScene.timer++;
+  const t = sushiScene.timer;
+
+  // На 75-м кадре камушек откусывает ролл и начинает жевать
+  if (t === 75) {
+    sushiScene.eaten = true;
+    currentEmotion = 1; // Радостная улыбка
+    nextEmotionTime = Date.now() + 5000;
+  }
+
+  // Анимация жевания (легкое подпрыгивание)
+  if (t > 75 && t < 135 && t % 12 === 0) {
+    for (let i = 0; i < NUM_POINTS; i++) {
+      nodes[i].vy -= (nodes[i].oy < 0 ? 3.5 : 1.5);
+    }
+  }
+
+  if (t >= sushiScene.duration) {
+    sushiScene.active = false;
+    walker.nextWalkTime = Date.now() + 2000;
+  }
+}
+
+function drawSushiScene(fx, fy, s) {
+  if (!sushiScene.active) return;
+  const t = sushiScene.timer;
+
+  // Плавный выезд палочек слева к рту и уезд обратно
+  let slideOffset = 0;
+  if (t < 30) slideOffset = (30 - t) * 3.5;
+  if (t > 135) slideOffset = (t - 135) * 3.5;
+
+  const rx = fx - (22 + slideOffset) * s;
+  const ry = fy + (24 + Math.sin(t * 0.2) * 2) * s;
+
+  ctx.save();
+  // Деревянные палочки для суши
+  ctx.strokeStyle = '#d97706';
+  ctx.lineWidth = Math.max(2.5, 4 * s);
+  ctx.lineCap = 'round';
+
+  // Верхняя палочка
+  ctx.beginPath();
+  ctx.moveTo(rx - 75 * s, ry - 26 * s);
+  ctx.lineTo(rx + 6 * s, ry - 4 * s);
+  ctx.stroke();
+
+  // Нижняя палочка
+  ctx.beginPath();
+  ctx.moveTo(rx - 75 * s, ry - 10 * s);
+  ctx.lineTo(rx + 6 * s, ry + 5 * s);
+  ctx.stroke();
+
+  // Тонкий темный контур на палочках
+  ctx.strokeStyle = '#78350f';
+  ctx.lineWidth = Math.max(1, 1.5 * s);
+  ctx.beginPath();
+  ctx.moveTo(rx - 75 * s, ry - 26 * s);
+  ctx.lineTo(rx + 6 * s, ry - 4 * s);
+  ctx.moveTo(rx - 75 * s, ry - 10 * s);
+  ctx.lineTo(rx + 6 * s, ry + 5 * s);
+  ctx.stroke();
+
+  // Сам ролл между кончиками палочек (исчезает, когда съеден)
+  if (!sushiScene.eaten) {
+    drawRollIcon(rx, ry, s * 1.15, -0.15);
+  }
+
+  ctx.restore();
+}
+
+// --- 2. МИНИ-ИГРА С ГИРОСКОПОМ: ПОЙМАЙ 5 ЛЕТАЮЩИХ РОЛЛОВ ---
+function startSushiGame() {
+  if (isAnySceneActive()) return;
+  if (!tiltEnabled) {
+    alert('Сначала нажмите кнопку «Гироскоп: ВЫКЛ», чтобы включить управление наклоном телефона!');
+    return;
+  }
+
+  walker.isWalking = false;
+  sushiGame.active = true;
+  sushiGame.caught = 0;
+  sushiGame.winTimer = 0;
+  sushiGame.rolls = [];
+  currentEmotion = 3;
+
+  for (let i = 0; i < sushiGame.total; i++) {
+    sushiGame.rolls.push({
+      x: 50 + Math.random() * (canvas.width - 100),
+      y: 40 + Math.random() * (canvas.height - 100),
+      vx: (Math.random() < 0.5 ? -1 : 1) * (1.8 + Math.random() * 1.6),
+      vy: (Math.random() < 0.5 ? -1 : 1) * (1.5 + Math.random() * 1.5),
+      angle: Math.random() * Math.PI * 2,
+      spin: (Math.random() - 0.5) * 0.08,
+      caught: false
+    });
+  }
+}
+
+function updateSushiGame() {
+  if (!sushiGame.active) return;
+
+  if (sushiGame.caught >= sushiGame.total) {
+    sushiGame.winTimer++;
+    currentEmotion = 1;
+    if (sushiGame.winTimer > 120) {
+      sushiGame.active = false;
+    }
+    return;
+  }
+
+  const catchRadius = 64 * life.scale;
+
+  for (let r of sushiGame.rolls) {
+    if (r.caught) continue;
+
+    r.x += r.vx;
+    r.y += r.vy;
+    r.angle += r.spin;
+
+    // Отскок летающих роллов от границ экрана
+    if (r.x < 22) { r.x = 22; r.vx = Math.abs(r.vx); }
+    if (r.x > canvas.width - 22) { r.x = canvas.width - 22; r.vx = -Math.abs(r.vx); }
+    if (r.y < 28) { r.y = 28; r.vy = Math.abs(r.vy); }
+    if (r.y > canvas.height - 22) { r.y = canvas.height - 22; r.vy = -Math.abs(r.vy); }
+
+    // Проверка столкновения с камушком
+    if (Math.hypot(r.x - center.x, r.y - center.y) < catchRadius) {
+      r.caught = true;
+      sushiGame.caught++;
+      currentEmotion = 1;
+      nextEmotionTime = Date.now() + 2000;
+      // Радостный импульс при поимке
+      for (let i = 0; i < NUM_POINTS; i++) {
+        nodes[i].vy -= (nodes[i].oy < 0 ? 5 : 2);
+      }
+    }
+  }
+}
+
+function drawSushiGame() {
+  if (!sushiGame.active) return;
+
+  // Отрисовка оставшихся летающих роллов
+  for (let r of sushiGame.rolls) {
+    if (!r.caught) {
+      drawRollIcon(r.x, r.y, 1.1, r.angle);
+    }
+  }
+
+  // Счетчик пойманных роллов сверху по центру
+  ctx.save();
+  ctx.fillStyle = 'rgba(24, 24, 27, 0.75)';
+  ctx.strokeStyle = '#52525b';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(canvas.width / 2 - 85, 10, 170, 28, 12);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 14px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  if (sushiGame.caught >= sushiGame.total) {
+    ctx.fillStyle = '#4ade80';
+    ctx.fillText('ВСЕ РОЛЛЫ ПОЙМАНЫ!', canvas.width / 2, 29);
+  } else {
+    ctx.fillText('Роллы: ' + sushiGame.caught + ' / ' + sushiGame.total, canvas.width / 2, 29);
+  }
+  ctx.restore();
+}
+
+// --- БОЙ В СТИЛЕ SHADOW FIGHT ---
 function startFightScene() {
   if (isAnySceneActive()) return;
   walker.isWalking = false;
@@ -129,241 +346,194 @@ function startFightScene() {
   fightScene.enemy = { x: 430, y: 185, vx: 0, vy: 0, hp: 100, swordAngle: -0.6 };
   fightScene.playerHp = 100;
   fightScene.playerSwordAngle = 0.6;
-  fightScene.slashes = [];
-  fightScene.sparks = [];
-  fightScene.flashAlpha = 0;
-  currentEmotion = 0;
+fightScene.slashes = [];
+fightScene.sparks = [];
+fightScene.flashAlpha = 0;
+currentEmotion = 0;
 }
-
 function spawnHitSparks(x, y, color) {
-  for (let i = 0; i < 16; i++) {
-    fightScene.sparks.push({
-      x: x,
-      y: y,
-      vx: (Math.random() - 0.5) * 16,
-      vy: (Math.random() - 0.7) * 14,
-      size: 2.5 + Math.random() * 4.5,
-      color: color,
-      alpha: 1
-    });
-  }
+for (let i = 0; i < 16; i++) {
+fightScene.sparks.push({
+x: x,
+y: y,
+vx: (Math.random() - 0.5) * 16,
+vy: (Math.random() - 0.7) * 14,
+size: 2.5 + Math.random() * 4.5,
+color: color,
+alpha: 1
+});
 }
-
+}
 function addSlashTrail(x, y, radius, startAng, endAng, color) {
-  fightScene.slashes.push({
-    x: x,
-    y: y,
-    radius: radius,
-    startAng: startAng,
-    endAng: endAng,
-    color: color,
-    alpha: 0.95
-  });
+fightScene.slashes.push({
+x: x,
+y: y,
+radius: radius,
+startAng: startAng,
+endAng: endAng,
+color: color,
+alpha: 0.95
+});
 }
-
 function updateFightScene() {
-  fightScene.timer++;
-  const t = fightScene.timer;
-  const e = fightScene.enemy;
-  const floorY = canvas.height - MARGIN - 54 * life.scale;
-
-  // Физика соперника
-  e.vy += 0.42;
-  e.x += e.vx;
-  e.y += e.vy;
-  e.vx *= 0.88;
-  if (e.y > floorY) {
-    e.y = floorY;
-    e.vy = 0;
-  }
-  if (fightScene.phase !== 'outro') {
-    e.x = Math.max(60, Math.min(canvas.width - 60, e.x));
-  }
-
-  // Плавный возврат катан в боевую стойку
-  fightScene.playerSwordAngle += (0.55 - fightScene.playerSwordAngle) * 0.15;
-  e.swordAngle += (-0.55 - e.swordAngle) * 0.15;
-
-  if (fightScene.flashAlpha > 0) {
-    fightScene.flashAlpha = Math.max(0, fightScene.flashAlpha - 0.08);
-  }
-
-  // ФАЗА 1: Заставка перед боем (0 - 135 кадр)
-  if (fightScene.phase === 'intro') {
-    moveCharacterTo(115, floorY, 0.12);
-    e.x += (365 - e.x) * 0.12;
-    if (t >= 135) {
-      fightScene.phase = 'fighting';
-      fightScene.timer = 0;
-      fightScene.flashAlpha = 0.85;
-    }
-  }
-  // ФАЗА 2: Бой на катанах (0 - 250 кадр)
-  else if (fightScene.phase === 'fighting') {
-    // 1. Атака нашего камня
-    if (t === 15) {
-      for (let n of nodes) { n.vx += 18; n.vy -= 9; }
-      fightScene.playerSwordAngle = -1.2; // Замах
-    }
-    if (t === 32) {
-      fightScene.playerSwordAngle = 1.6; // Удар катаной
-      addSlashTrail(center.x + 25, center.y, 75, -1.1, 1.3, '#38bdf8');
-      e.vx = 20; e.vy = -8;
-      e.hp = 65;
-      fightScene.flashAlpha = 0.55;
-      spawnHitSparks((center.x + e.x) / 2, center.y, '#38bdf8');
-    }
-
-    // 2. Ответный выпад Тени алой катаной
-    if (t === 80) {
-      e.vx = -22; e.vy = -9;
-      e.swordAngle = 1.2; // Замах Тени
-    }
-    if (t === 96) {
-      e.swordAngle = -1.7; // Удар Тени
-      addSlashTrail(e.x - 25, e.y, 75, 1.8, 4.2, '#ef4444');
-      for (let n of nodes) { n.vx -= 18; n.vy -= 7; }
-      fightScene.playerHp = 60;
-      currentEmotion = 3; // Удивление от удара
-      fightScene.flashAlpha = 0.55;
-      spawnHitSparks((center.x + e.x) / 2, center.y, '#ef4444');
-    }
-
-    // 3. Скрещивание клинков в прыжке
-    if (t === 140) {
-      currentEmotion = 0;
-      for (let n of nodes) { n.vx += 16; n.vy -= 11; }
-      e.vx = -16; e.vy = -11;
-      fightScene.playerSwordAngle = -1.1;
-      e.swordAngle = 1.1;
-    }
-    if (t === 156) {
-      fightScene.playerSwordAngle = 1.4;
-      e.swordAngle = -1.4;
-      addSlashTrail(240, 145, 80, -0.8, 0.8, '#38bdf8');
-      addSlashTrail(240, 145, 80, 2.3, 3.9, '#ef4444');
-      for (let n of nodes) { n.vx -= 12; n.vy -= 4; }
-      e.vx = 12; e.vy = -4;
-      fightScene.playerHp = 35;
-      e.hp = 35;
-      fightScene.flashAlpha = 0.85;
-      spawnHitSparks(240, 140, '#facc15');
-    }
-
-    // 4. Решающий удар нашего камня
-    if (t === 195) {
-      for (let n of nodes) { n.vx += 24; n.vy -= 11; }
-      fightScene.playerSwordAngle = -1.4;
-    }
-    if (t === 212) {
-      fightScene.playerSwordAngle = 1.9;
-      addSlashTrail(center.x + 30, center.y, 85, -1.3, 1.5, '#38bdf8');
-      e.vx = 38; e.vy = -15;
-      e.hp = 0;
-      fightScene.flashAlpha = 0.95;
-      spawnHitSparks(e.x - 20, e.y, '#ef4444');
-      fightScene.phase = 'outro';
-      fightScene.timer = 0;
-      currentEmotion = 1; // Победная улыбка!
-    }
-  }
-  // ФАЗА 3: Победа
-  else if (fightScene.phase === 'outro') {
-    e.x += 14;
-    moveCharacterTo(240, floorY, 0.08);
-    if (t > 120) {
-      fightScene.active = false;
-      walker.nextWalkTime = Date.now() + 2000;
-    }
-  }
+fightScene.timer++;
+const t = fightScene.timer;
+const e = fightScene.enemy;
+const floorY = canvas.height - MARGIN - 54 * life.scale;
+e.vy += 0.42;
+e.x += e.vx;
+e.y += e.vy;
+e.vx *= 0.88;
+if (e.y > floorY) {
+e.y = floorY;
+e.vy = 0;
 }
-
-// Функция рисования катаны в руке
+if (fightScene.phase !== 'outro') {
+e.x = Math.max(60, Math.min(canvas.width - 60, e.x));
+}
+fightScene.playerSwordAngle += (0.55 - fightScene.playerSwordAngle) * 0.15;
+e.swordAngle += (-0.55 - e.swordAngle) * 0.15;
+if (fightScene.flashAlpha > 0) {
+fightScene.flashAlpha = Math.max(0, fightScene.flashAlpha - 0.08);
+}
+if (fightScene.phase === 'intro') {
+moveCharacterTo(115, floorY, 0.12);
+e.x += (365 - e.x) * 0.12;
+if (t >= 135) {
+fightScene.phase = 'fighting';
+fightScene.timer = 0;
+fightScene.flashAlpha = 0.85;
+}
+} else if (fightScene.phase === 'fighting') {
+if (t === 15) {
+for (let n of nodes) { n.vx += 18; n.vy -= 9; }
+fightScene.playerSwordAngle = -1.2;
+}
+if (t === 32) {
+fightScene.playerSwordAngle = 1.6;
+addSlashTrail(center.x + 25, center.y, 75, -1.1, 1.3, '#38bdf8');
+e.vx = 20; e.vy = -8;
+e.hp = 65;
+fightScene.flashAlpha = 0.55;
+spawnHitSparks((center.x + e.x) / 2, center.y, '#38bdf8');
+}
+if (t === 80) {
+e.vx = -22; e.vy = -9;
+e.swordAngle = 1.2;
+}
+if (t === 96) {
+e.swordAngle = -1.7;
+addSlashTrail(e.x - 25, e.y, 75, 1.8, 4.2, '#ef4444');
+for (let n of nodes) { n.vx -= 18; n.vy -= 7; }
+fightScene.playerHp = 60;
+currentEmotion = 3;
+fightScene.flashAlpha = 0.55;
+spawnHitSparks((center.x + e.x) / 2, center.y, '#ef4444');
+}
+if (t === 140) {
+currentEmotion = 0;
+for (let n of nodes) { n.vx += 16; n.vy -= 11; }
+e.vx = -16; e.vy = -11;
+fightScene.playerSwordAngle = -1.1;
+e.swordAngle = 1.1;
+}
+if (t === 156) {
+fightScene.playerSwordAngle = 1.4;
+e.swordAngle = -1.4;
+addSlashTrail(240, 145, 80, -0.8, 0.8, '#38bdf8');
+addSlashTrail(240, 145, 80, 2.3, 3.9, '#ef4444');
+for (let n of nodes) { n.vx -= 12; n.vy -= 4; }
+e.vx = 12; e.vy = -4;
+fightScene.playerHp = 35;
+e.hp = 35;
+fightScene.flashAlpha = 0.85;
+spawnHitSparks(240, 140, '#facc15');
+}
+if (t === 195) {
+for (let n of nodes) { n.vx += 24; n.vy -= 11; }
+fightScene.playerSwordAngle = -1.4;
+}
+if (t === 212) {
+fightScene.playerSwordAngle = 1.9;
+addSlashTrail(center.x + 30, center.y, 85, -1.3, 1.5, '#38bdf8');
+e.vx = 38; e.vy = -15;
+e.hp = 0;
+fightScene.flashAlpha = 0.95;
+spawnHitSparks(e.x - 20, e.y, '#ef4444');
+fightScene.phase = 'outro';
+fightScene.timer = 0;
+currentEmotion = 1;
+}
+} else if (fightScene.phase === 'outro') {
+e.x += 14;
+moveCharacterTo(240, floorY, 0.08);
+if (t > 120) {
+fightScene.active = false;
+walker.nextWalkTime = Date.now() + 2000;
+}
+}
+}
 function drawKatana(x, y, angle, bladeColor, glowColor, flip) {
-  ctx.save();
-  ctx.translate(x, y);
-  if (flip) ctx.scale(-1, 1);
-  ctx.rotate(angle);
-
-  // Рукоять катаны
-  ctx.fillStyle = '#18181b';
-  ctx.strokeStyle = '#71717a';
-  ctx.lineWidth = 1.5;
-  ctx.fillRect(-16, -2.5, 16, 5);
-  ctx.strokeRect(-16, -2.5, 16, 5);
-
-  // Гарда (цуба)
-  ctx.fillStyle = '#eab308';
-  ctx.fillRect(0, -6, 3.5, 12);
-
-  // Светящееся лезвие
-  ctx.shadowColor = glowColor;
-  ctx.shadowBlur = 10;
-  ctx.fillStyle = bladeColor;
-  ctx.beginPath();
-  ctx.moveTo(3.5, -2.5);
-  ctx.lineTo(68, -2);
-  ctx.lineTo(76, 0); // Острие
-  ctx.lineTo(68, 2.5);
-  ctx.lineTo(3.5, 2.5);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.restore();
+ctx.save();
+ctx.translate(x, y);
+if (flip) ctx.scale(-1, 1);
+ctx.rotate(angle);
+ctx.fillStyle = '#18181b';
+ctx.strokeStyle = '#71717a';
+ctx.lineWidth = 1.5;
+ctx.fillRect(-16, -2.5, 16, 5);
+ctx.strokeRect(-16, -2.5, 16, 5);
+ctx.fillStyle = '#eab308';
+ctx.fillRect(0, -6, 3.5, 12);
+ctx.shadowColor = glowColor;
+ctx.shadowBlur = 10;
+ctx.fillStyle = bladeColor;
+ctx.beginPath();
+ctx.moveTo(3.5, -2.5);
+ctx.lineTo(68, -2);
+ctx.lineTo(76, 0);
+ctx.lineTo(68, 2.5);
+ctx.lineTo(3.5, 2.5);
+ctx.closePath();
+ctx.fill();
+ctx.restore();
 }
-
 function drawFightScene() {
-  if (!fightScene.active) return;
-  const e = fightScene.enemy;
-  const t = fightScene.timer;
-
-  ctx.save();
-
-  // 1. ВТОРОЙ КАМЕНЬ (ТЕНЕВОЙ СОПЕРНИК)
-  if (e.x < canvas.width + 80) {
-    ctx.save();
-    ctx.translate(e.x, e.y);
-
-    // Желейное покачивание соперника
-    const squashY = 1 + Math.sin(t * 0.25) * 0.05;
-    const squashX = 1 - Math.sin(t * 0.25) * 0.05;
-    ctx.scale(squashX, squashY);
-
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 16;
-    ctx.fillStyle = '#09090b';
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 3.5;
-
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 56, 52, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Злые светящиеся красные глаза соперника
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath();
-    ctx.ellipse(-18, -12, 9, 13, 0.15, 0, Math.PI * 2);
-    ctx.ellipse(4, -14, 9, 13, -0.1, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Хмурые брови тени
-    ctx.strokeStyle = '#09090b';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(-28, -24); ctx.lineTo(-10, -16);
-    ctx.moveTo(14, -25); ctx.lineTo(-4, -17);
-    ctx.stroke();
-
-    ctx.restore();
-
-    // Алая катана в руках у соперника
-  drawKatana(e.x - 36, e.y + 8, e.swordAngle, '#fca5a5', '#ef4444', true);
+if (!fightScene.active) return;
+const e = fightScene.enemy;
+const t = fightScene.timer;
+ctx.save();
+if (e.x < canvas.width + 80) {
+ctx.save();
+ctx.translate(e.x, e.y);
+const squashY = 1 + Math.sin(t * 0.25) * 0.05;
+const squashX = 1 - Math.sin(t * 0.25) * 0.05;
+ctx.scale(squashX, squashY);
+ctx.shadowColor = '#ef4444';
+ctx.shadowBlur = 16;
+ctx.fillStyle = '#09090b';
+ctx.strokeStyle = '#ef4444';
+ctx.lineWidth = 3.5;
+ctx.beginPath();
+ctx.ellipse(0, 0, 56, 52, 0, 0, Math.PI * 2);
+ctx.fill();
+ctx.stroke();
+ctx.shadowBlur = 10;
+ctx.fillStyle = '#ef4444';
+ctx.beginPath();
+ctx.ellipse(-18, -12, 9, 13, 0.15, 0, Math.PI * 2);
+ctx.ellipse(4, -14, 9, 13, -0.1, 0, Math.PI * 2);
+ctx.fill();
+ctx.strokeStyle = '#09090b';
+ctx.lineWidth = 4;
+ctx.beginPath();
+ctx.moveTo(-28, -24); ctx.lineTo(-10, -16);
+ctx.moveTo(14, -25); ctx.lineTo(-4, -17);
+ctx.stroke();
+ctx.restore();
+drawKatana(e.x - 36, e.y + 8, e.swordAngle, '#fca5a5', '#ef4444', true);
 }
-// 2. СИНЯЯ КАТАНА В РУКАХ У НАШЕГО КАМНЯ
 drawKatana(center.x + 36 * life.scale, center.y + 8 * life.scale, fightScene.playerSwordAngle, '#e0f2fe', '#38bdf8', false);
-// 3. СЛЕДЫ ОТ ВЗМАХОВ КАТАН (SLASH TRAILS)
 for (let i = fightScene.slashes.length - 1; i >= 0; i--) {
 let sl = fightScene.slashes[i];
 sl.alpha -= 0.07;
@@ -383,7 +553,6 @@ ctx.arc(sl.x, sl.y, sl.radius, sl.startAng, sl.endAng);
 ctx.stroke();
 ctx.restore();
 }
-// 4. ПОЛОСКИ ЗДОРОВЬЯ (HP BARS)
 ctx.fillStyle = '#18181b';
 ctx.strokeStyle = '#71717a';
 ctx.lineWidth = 2;
@@ -397,12 +566,10 @@ ctx.strokeRect(canvas.width - 193, 14, 175, 14);
 ctx.fillStyle = '#ef4444';
 const enemyBarW = Math.max(0, 171 * (e.hp / 100));
 ctx.fillRect(canvas.width - 22 - enemyBarW, 16, enemyBarW, 10);
-// 5. ЭПИЧНАЯ ЗАСТАВКА ПЕРЕД БОЕМ (SHADOW FIGHT INTRO)
 if (fightScene.phase === 'intro') {
 const slideIn = Math.min(1, t / 18);
 ctx.fillStyle = 'rgba(9, 9, 11, 0.78)';
 ctx.fillRect(0, 0, canvas.width, canvas.height);
-// Левая боевая плашка (КАМЕНЬ)
 ctx.fillStyle = '#1e3a8a';
 ctx.strokeStyle = '#38bdf8';
 ctx.lineWidth = 3;
@@ -414,7 +581,6 @@ ctx.lineTo(-20, 96);
 ctx.closePath();
 ctx.fill();
 ctx.stroke();
-// Правая боевая плашка (ТЕНЬ)
 ctx.fillStyle = '#7f1d1d';
 ctx.strokeStyle = '#ef4444';
 ctx.beginPath();
@@ -425,14 +591,12 @@ ctx.lineTo(canvas.width + 20, 96);
 ctx.closePath();
 ctx.fill();
 ctx.stroke();
-// Имена бойцов на плашках
 ctx.fillStyle = '#ffffff';
 ctx.font = '900 20px -apple-system, sans-serif';
 ctx.textAlign = 'left';
 ctx.fillText('КАМЕНЬ', 24 * slideIn, 79);
 ctx.textAlign = 'right';
 ctx.fillText('ТЕНЬ', canvas.width - 24 * slideIn, 79);
-// Надпись VS или FIGHT! по центру
 ctx.textAlign = 'center';
 if (t < 80) {
 ctx.fillStyle = '#facc15';
@@ -460,7 +624,6 @@ ctx.shadowBlur = 15;
 ctx.font = '900 40px -apple-system, sans-serif';
 ctx.fillText('ПОБЕДА!', canvas.width / 2, 86);
 }
-// 6. ИСКРЫ ОТ СТОЛКНОВЕНИЯ КАТАН
 for (let i = fightScene.sparks.length - 1; i >= 0; i--) {
 let s = fightScene.sparks[i];
 s.x += s.vx; s.y += s.vy; s.vy += 0.4; s.alpha -= 0.04;
@@ -824,118 +987,93 @@ if (life.timer >= 165) triggerRebirth();
 }
 // --- СЦЕНКА С БУТЫЛКОЙ ВИСКИ ---
 function startDrinkScene() {
-  if (isAnySceneActive()) return;
-  walker.isWalking = false;
-  drinkScene.active = true;
-  drinkScene.timer = 0;
-  currentEmotion = 1;
+if (isAnySceneActive()) return;
+walker.isWalking = false;
+drinkScene.active = true;
+drinkScene.timer = 0;
+currentEmotion = 1;
 }
-
 function updateDrinkScene() {
-  drinkScene.timer++;
-  const t = drinkScene.timer;
-
-  // Во время глотков камушек слегка запрокидывает голову и покачивается
-  if (t > 25 && t < 155) {
-    for (let i = 0; i < NUM_POINTS; i++) {
-      if (nodes[i].oy < 0) {
-        nodes[i].vx += Math.sin(t * 0.25) * 0.45;
-      }
-    }
-  }
-
-  // В конце радостно подпрыгивает
-  if (t === 155) {
-    currentEmotion = 1;
-    nextEmotionTime = Date.now() + 5000;
-    for (let i = 0; i < NUM_POINTS; i++) {
-      nodes[i].vy -= (nodes[i].oy < 0 ? 5 : 2);
-    }
-  }
-
-  if (t >= drinkScene.duration) {
-    drinkScene.active = false;
-    walker.nextWalkTime = Date.now() + 2000;
-  }
+drinkScene.timer++;
+const t = drinkScene.timer;
+if (t > 25 && t < 155) {
+for (let i = 0; i < NUM_POINTS; i++) {
+if (nodes[i].oy < 0) {
+nodes[i].vx += Math.sin(t * 0.25) * 0.45;
 }
-
+}
+}
+if (t === 155) {
+currentEmotion = 1;
+nextEmotionTime = Date.now() + 5000;
+for (let i = 0; i < NUM_POINTS; i++) {
+nodes[i].vy -= (nodes[i].oy < 0 ? 5 : 2);
+}
+}
+if (t >= drinkScene.duration) {
+drinkScene.active = false;
+walker.nextWalkTime = Date.now() + 2000;
+}
+}
 function drawWhiskeyBottle(x, y, angle, s, liquidLevel) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-  ctx.scale(s, s);
-
-  // Корпус квадратной стеклянной бутылки
-  ctx.fillStyle = 'rgba(217, 119, 6, 0.35)';
-  ctx.strokeStyle = '#111214';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.roundRect(-14, -18, 28, 44, 4);
-  ctx.fill();
-  ctx.stroke();
-
-  // Янтарный напиток внутри
-  const fillH = 38 * liquidLevel;
-  if (fillH > 0) {
-    ctx.fillStyle = '#b45309';
-    ctx.fillRect(-12, 24 - fillH, 24, fillH);
-  }
-
-  // Плечики и горлышко бутылки
-  ctx.fillStyle = 'rgba(217, 119, 6, 0.45)';
-  ctx.beginPath();
-  ctx.moveTo(-14, -18);
-  ctx.lineTo(-6, -28);
-  ctx.lineTo(6, -28);
-  ctx.lineTo(14, -18);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Черная обертка на горлышке и пробка
-  ctx.fillStyle = '#18181b';
-  ctx.fillRect(-6, -44, 12, 16);
-  ctx.strokeRect(-6, -44, 12, 16);
-
-  // Черная этикетка с белой рамкой и цифрой 7
-  ctx.fillStyle = '#09090b';
-  ctx.fillRect(-13, -11, 26, 28);
-  ctx.strokeStyle = '#e4e4e7';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(-11, -9, 22, 24);
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 11px serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('7', 0, 7);
-
-  ctx.restore();
+ctx.save();
+ctx.translate(x, y);
+ctx.rotate(angle);
+ctx.scale(s, s);
+ctx.fillStyle = 'rgba(217, 119, 6, 0.35)';
+ctx.strokeStyle = '#111214';
+ctx.lineWidth = 2.5;
+ctx.beginPath();
+ctx.roundRect(-14, -18, 28, 44, 4);
+ctx.fill();
+ctx.stroke();
+const fillH = 38 * liquidLevel;
+if (fillH > 0) {
+ctx.fillStyle = '#b45309';
+ctx.fillRect(-12, 24 - fillH, 24, fillH);
 }
-
+ctx.fillStyle = 'rgba(217, 119, 6, 0.45)';
+ctx.beginPath();
+ctx.moveTo(-14, -18);
+ctx.lineTo(-6, -28);
+ctx.lineTo(6, -28);
+ctx.lineTo(14, -18);
+ctx.closePath();
+ctx.fill();
+ctx.stroke();
+ctx.fillStyle = '#18181b';
+ctx.fillRect(-6, -44, 12, 16);
+ctx.strokeRect(-6, -44, 12, 16);
+ctx.fillStyle = '#09090b';
+ctx.fillRect(-13, -11, 26, 28);
+ctx.strokeStyle = '#e4e4e7';
+ctx.lineWidth = 1;
+ctx.strokeRect(-11, -9, 22, 24);
+ctx.fillStyle = '#ffffff';
+ctx.font = 'bold 11px serif';
+ctx.textAlign = 'center';
+ctx.fillText('7', 0, 7);
+ctx.restore();
+}
 function drawDrinkScene(fx, fy, s) {
-  if (!drinkScene.active) return;
-  const t = drinkScene.timer;
-
-  let slideOffset = 0;
-  if (t < 20) slideOffset = (20 - t) * 4;
-  if (t > 165) slideOffset = (t - 165) * 4;
-
-  // Угол 0.72 радиан (~41 градус): горлышко направлено снизу-слева точно в рот
-  let tiltAngle = 0.25;
-  let drinkLiftY = 36;
-  if (t >= 20 && t <= 155) {
-    tiltAngle = 0.72 + Math.sin(t * 0.25) * 0.08;
-    drinkLiftY = 44;
-  }
-
-  const progress = Math.max(0, Math.min(1, (t - 25) / 130));
-  const liquidLevel = 0.85 - progress * 0.55;
-
-  drawWhiskeyBottle(
-    fx - (34 + slideOffset) * s,
-    fy + (drinkLiftY + slideOffset * 0.5) * s,
-    tiltAngle,
-    s,
-    liquidLevel
-  );
+if (!drinkScene.active) return;
+const t = drinkScene.timer;
+let slideOffset = 0;
+if (t < 20) slideOffset = (20 - t) * 4;
+if (t > 165) slideOffset = (t - 165) * 4;
+let tiltAngle = 0.25;
+let drinkLiftY = 36;
+if (t >= 20 && t <= 155) {
+tiltAngle = 0.72 + Math.sin(t * 0.25) * 0.08;
+drinkLiftY = 44;
+}
+const progress = Math.max(0, Math.min(1, (t - 25) / 130));
+const liquidLevel = 0.85 - progress * 0.55;
+drawWhiskeyBottle(
+fx - (34 + slideOffset) * s,
+fy + (drinkLiftY + slideOffset * 0.5) * s,
+tiltAngle,
+s,
+liquidLevel
+);
 }
