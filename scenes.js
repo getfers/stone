@@ -6,6 +6,16 @@ let bulbScene = { active: false, timer: 0, ladderVisible: false, bulbState: 'non
 let blocksScene = { active: false, timer: 0, phase: 'falling', currentIdx: 0, blocks: [], shapeType: 0 };
 let slideScene = { active: false, phase: 'approach', timer: 0, progress: 0, speed: 0 };
 
+let drinkScene = {
+  active: false,
+  timer: 0,
+  duration: 190
+};
+
+function isAnySceneActive() {
+  return vape.active || bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || drinkScene.active || life.state !== 'alive';
+}
+
 let fightScene = {
   active: false,
   timer: 0,
@@ -811,4 +821,121 @@ ctx.fill();
 ctx.restore();
 }
 if (life.timer >= 165) triggerRebirth();
+}
+// --- СЦЕНКА С БУТЫЛКОЙ ВИСКИ ---
+function startDrinkScene() {
+  if (isAnySceneActive()) return;
+  walker.isWalking = false;
+  drinkScene.active = true;
+  drinkScene.timer = 0;
+  currentEmotion = 1;
+}
+
+function updateDrinkScene() {
+  drinkScene.timer++;
+  const t = drinkScene.timer;
+
+  // Во время глотков камушек слегка запрокидывает голову и покачивается
+  if (t > 25 && t < 155) {
+    for (let i = 0; i < NUM_POINTS; i++) {
+      if (nodes[i].oy < 0) {
+        nodes[i].vx += Math.sin(t * 0.25) * 0.45;
+      }
+    }
+  }
+
+  // В конце радостно подпрыгивает
+  if (t === 155) {
+    currentEmotion = 1;
+    nextEmotionTime = Date.now() + 5000;
+    for (let i = 0; i < NUM_POINTS; i++) {
+      nodes[i].vy -= (nodes[i].oy < 0 ? 5 : 2);
+    }
+  }
+
+  if (t >= drinkScene.duration) {
+    drinkScene.active = false;
+    walker.nextWalkTime = Date.now() + 2000;
+  }
+}
+
+function drawWhiskeyBottle(x, y, angle, s, liquidLevel) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(s, s);
+
+  // Корпус квадратной стеклянной бутылки
+  ctx.fillStyle = 'rgba(217, 119, 6, 0.35)';
+  ctx.strokeStyle = '#111214';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.roundRect(-14, -18, 28, 44, 4);
+  ctx.fill();
+  ctx.stroke();
+
+  // Янтарный напиток внутри
+  const fillH = 38 * liquidLevel;
+  if (fillH > 0) {
+    ctx.fillStyle = '#b45309';
+    ctx.fillRect(-12, 24 - fillH, 24, fillH);
+  }
+
+  // Плечики и горлышко бутылки
+  ctx.fillStyle = 'rgba(217, 119, 6, 0.45)';
+  ctx.beginPath();
+  ctx.moveTo(-14, -18);
+  ctx.lineTo(-6, -28);
+  ctx.lineTo(6, -28);
+  ctx.lineTo(14, -18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Черная обертка на горлышке и пробка
+  ctx.fillStyle = '#18181b';
+  ctx.fillRect(-6, -44, 12, 16);
+  ctx.strokeRect(-6, -44, 12, 16);
+
+  // Черная этикетка с белой рамкой и цифрой 7
+  ctx.fillStyle = '#09090b';
+  ctx.fillRect(-13, -11, 26, 28);
+  ctx.strokeStyle = '#e4e4e7';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-11, -9, 22, 24);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 11px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('7', 0, 7);
+
+  ctx.restore();
+}
+
+function drawDrinkScene(fx, fy, s) {
+  if (!drinkScene.active) return;
+  const t = drinkScene.timer;
+
+  // Плавное появление и убирание бутылки
+  let slideOffset = 0;
+  if (t < 20) slideOffset = (20 - t) * 4;
+  if (t > 165) slideOffset = (t - 165) * 4;
+
+  // Угол наклона бутылки ко рту (запрокидывается во время глотков)
+  let tiltAngle = -0.35;
+  if (t >= 20 && t <= 155) {
+    tiltAngle = -1.85 + Math.sin(t * 0.25) * 0.12;
+  }
+
+  // Уровень жидкости уменьшается во время питья
+  const progress = Math.max(0, Math.min(1, (t - 25) / 130));
+  const liquidLevel = 0.85 - progress * 0.55;
+
+  drawWhiskeyBottle(
+    fx - (26 + slideOffset) * s,
+    fy + (16 + slideOffset * 0.5) * s,
+    tiltAngle,
+    s,
+    liquidLevel
+  );
 }
