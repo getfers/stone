@@ -7,7 +7,6 @@ let blocksScene = { active: false, timer: 0, phase: 'falling', currentIdx: 0, bl
 let slideScene = { active: false, phase: 'approach', timer: 0, progress: 0, speed: 0 };
 let drinkScene = { active: false, timer: 0, duration: 190 };
 
-// Новые сценки: поедание роллов палочками и игра на гироскопе
 let sushiScene = { active: false, timer: 0, duration: 175, eaten: false };
 let sushiGame = { active: false, rolls: [], caught: 0, total: 5, winTimer: 0 };
 
@@ -15,6 +14,7 @@ let fightScene = {
   active: false,
   timer: 0,
   phase: 'intro',
+  playerWins: true,
   enemy: { x: 420, y: 185, vx: 0, vy: 0, hp: 100, swordAngle: -0.6 },
   playerHp: 100,
   playerSwordAngle: 0.6,
@@ -124,7 +124,6 @@ function drawRollIcon(x, y, s, angle) {
   ctx.rotate(angle || 0);
   ctx.scale(s, s);
 
-  // Лосось сверху и по бокам
   ctx.fillStyle = '#fb7185';
   ctx.strokeStyle = '#111214';
   ctx.lineWidth = 2;
@@ -133,13 +132,11 @@ function drawRollIcon(x, y, s, angle) {
   ctx.fill();
   ctx.stroke();
 
-  // Белый рис внутри
   ctx.fillStyle = '#f8fafc';
   ctx.beginPath();
   ctx.roundRect(-9, -6, 18, 12, 4);
   ctx.fill();
 
-  // Нори и начинка (огурец + авокадо)
   ctx.fillStyle = '#14532d';
   ctx.beginPath();
   ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
@@ -160,21 +157,19 @@ function startSushiScene() {
   sushiScene.active = true;
   sushiScene.timer = 0;
   sushiScene.eaten = false;
-  currentEmotion = 3; // Удивляется вкусному роллу
+  currentEmotion = 3;
 }
 
 function updateSushiScene() {
   sushiScene.timer++;
   const t = sushiScene.timer;
 
-  // На 75-м кадре камушек откусывает ролл и начинает жевать
   if (t === 75) {
     sushiScene.eaten = true;
-    currentEmotion = 1; // Радостная улыбка
+    currentEmotion = 1;
     nextEmotionTime = Date.now() + 5000;
   }
 
-  // Анимация жевания (легкое подпрыгивание)
   if (t > 75 && t < 135 && t % 12 === 0) {
     for (let i = 0; i < NUM_POINTS; i++) {
       nodes[i].vy -= (nodes[i].oy < 0 ? 3.5 : 1.5);
@@ -191,7 +186,6 @@ function drawSushiScene(fx, fy, s) {
   if (!sushiScene.active) return;
   const t = sushiScene.timer;
 
-  // Плавный выезд палочек слева к рту и уезд обратно
   let slideOffset = 0;
   if (t < 30) slideOffset = (30 - t) * 3.5;
   if (t > 135) slideOffset = (t - 135) * 3.5;
@@ -200,24 +194,20 @@ function drawSushiScene(fx, fy, s) {
   const ry = fy + (24 + Math.sin(t * 0.2) * 2) * s;
 
   ctx.save();
-  // Деревянные палочки для суши
   ctx.strokeStyle = '#d97706';
   ctx.lineWidth = Math.max(2.5, 4 * s);
   ctx.lineCap = 'round';
 
-  // Верхняя палочка
   ctx.beginPath();
   ctx.moveTo(rx - 75 * s, ry - 26 * s);
   ctx.lineTo(rx + 6 * s, ry - 4 * s);
   ctx.stroke();
 
-  // Нижняя палочка
   ctx.beginPath();
   ctx.moveTo(rx - 75 * s, ry - 10 * s);
   ctx.lineTo(rx + 6 * s, ry + 5 * s);
   ctx.stroke();
 
-  // Тонкий темный контур на палочках
   ctx.strokeStyle = '#78350f';
   ctx.lineWidth = Math.max(1, 1.5 * s);
   ctx.beginPath();
@@ -227,7 +217,6 @@ function drawSushiScene(fx, fy, s) {
   ctx.lineTo(rx + 6 * s, ry + 5 * s);
   ctx.stroke();
 
-  // Сам ролл между кончиками палочек (исчезает, когда съеден)
   if (!sushiScene.eaten) {
     drawRollIcon(rx, ry, s * 1.15, -0.15);
   }
@@ -284,19 +273,16 @@ function updateSushiGame() {
     r.y += r.vy;
     r.angle += r.spin;
 
-    // Отскок летающих роллов от границ экрана
     if (r.x < 22) { r.x = 22; r.vx = Math.abs(r.vx); }
     if (r.x > canvas.width - 22) { r.x = canvas.width - 22; r.vx = -Math.abs(r.vx); }
     if (r.y < 28) { r.y = 28; r.vy = Math.abs(r.vy); }
     if (r.y > canvas.height - 22) { r.y = canvas.height - 22; r.vy = -Math.abs(r.vy); }
 
-    // Проверка столкновения с камушком
     if (Math.hypot(r.x - center.x, r.y - center.y) < catchRadius) {
       r.caught = true;
       sushiGame.caught++;
       currentEmotion = 1;
       nextEmotionTime = Date.now() + 2000;
-      // Радостный импульс при поимке
       for (let i = 0; i < NUM_POINTS; i++) {
         nodes[i].vy -= (nodes[i].oy < 0 ? 5 : 2);
       }
@@ -307,14 +293,12 @@ function updateSushiGame() {
 function drawSushiGame() {
   if (!sushiGame.active) return;
 
-  // Отрисовка оставшихся летающих роллов
   for (let r of sushiGame.rolls) {
     if (!r.caught) {
       drawRollIcon(r.x, r.y, 1.1, r.angle);
     }
   }
 
-  // Счетчик пойманных роллов сверху по центру
   ctx.save();
   ctx.fillStyle = 'rgba(24, 24, 27, 0.75)';
   ctx.strokeStyle = '#52525b';
@@ -336,45 +320,49 @@ function drawSushiGame() {
   ctx.restore();
 }
 
-// --- БОЙ В СТИЛЕ SHADOW FIGHT ---
+// --- БОЙ В СТИЛЕ SHADOW FIGHT (СЛУЧАЙНЫЙ ИСХОД 50/50) ---
 function startFightScene() {
   if (isAnySceneActive()) return;
   walker.isWalking = false;
   fightScene.active = true;
   fightScene.timer = 0;
   fightScene.phase = 'intro';
+  fightScene.playerWins = Math.random() < 0.5;
   fightScene.enemy = { x: 430, y: 185, vx: 0, vy: 0, hp: 100, swordAngle: -0.6 };
   fightScene.playerHp = 100;
   fightScene.playerSwordAngle = 0.6;
-fightScene.slashes = [];
-fightScene.sparks = [];
-fightScene.flashAlpha = 0;
-currentEmotion = 0;
+  fightScene.slashes = [];
+  fightScene.sparks = [];
+  fightScene.flashAlpha = 0;
+  currentEmotion = 0;
 }
+
 function spawnHitSparks(x, y, color) {
-for (let i = 0; i < 16; i++) {
-fightScene.sparks.push({
-x: x,
-y: y,
-vx: (Math.random() - 0.5) * 16,
-vy: (Math.random() - 0.7) * 14,
-size: 2.5 + Math.random() * 4.5,
-color: color,
-alpha: 1
-});
+  for (let i = 0; i < 16; i++) {
+    fightScene.sparks.push({
+      x: x,
+      y: y,
+      vx: (Math.random() - 0.5) * 16,
+      vy: (Math.random() - 0.7) * 14,
+      size: 2.5 + Math.random() * 4.5,
+      color: color,
+      alpha: 1
+    });
+  }
 }
-}
+
 function addSlashTrail(x, y, radius, startAng, endAng, color) {
-fightScene.slashes.push({
-x: x,
-y: y,
-radius: radius,
-startAng: startAng,
-endAng: endAng,
-color: color,
-alpha: 0.95
-});
+  fightScene.slashes.push({
+    x: x,
+    y: y,
+    radius: radius,
+    startAng: startAng,
+    endAng: endAng,
+    color: color,
+    alpha: 0.95
+  });
 }
+
 function updateFightScene() {
 fightScene.timer++;
 const t = fightScene.timer;
@@ -388,7 +376,7 @@ if (e.y > floorY) {
 e.y = floorY;
 e.vy = 0;
 }
-if (fightScene.phase !== 'outro') {
+if (fightScene.phase !== 'outro' || !fightScene.playerWins) {
 e.x = Math.max(60, Math.min(canvas.width - 60, e.x));
 }
 fightScene.playerSwordAngle += (0.55 - fightScene.playerSwordAngle) * 0.15;
@@ -449,6 +437,7 @@ e.hp = 35;
 fightScene.flashAlpha = 0.85;
 spawnHitSparks(240, 140, '#facc15');
 }
+if (fightScene.playerWins) {
 if (t === 195) {
 for (let n of nodes) { n.vx += 24; n.vy -= 11; }
 fightScene.playerSwordAngle = -1.4;
@@ -464,12 +453,39 @@ fightScene.phase = 'outro';
 fightScene.timer = 0;
 currentEmotion = 1;
 }
+} else {
+if (t === 195) {
+e.vx = -26; e.vy = -11;
+e.swordAngle = 1.4;
+}
+if (t === 212) {
+e.swordAngle = -1.9;
+addSlashTrail(e.x - 30, e.y, 85, 1.6, 4.4, '#ef4444');
+for (let n of nodes) { n.vx -= 34; n.vy -= 14; }
+fightScene.playerHp = 0;
+fightScene.flashAlpha = 0.95;
+spawnHitSparks(center.x + 20, center.y, '#38bdf8');
+fightScene.phase = 'outro';
+fightScene.timer = 0;
+currentEmotion = 2;
+}
+}
 } else if (fightScene.phase === 'outro') {
+if (fightScene.playerWins) {
 e.x += 14;
 moveCharacterTo(240, floorY, 0.08);
+} else {
+if (t < 80) {
+if (t % 25 === 0) e.vy = -8;
+e.x += (330 - e.x) * 0.08;
+} else {
+e.x += 12;
+}
+}
 if (t > 120) {
 fightScene.active = false;
 walker.nextWalkTime = Date.now() + 2000;
+nextEmotionTime = Date.now() + 4000;
 }
 }
 }
@@ -616,13 +632,21 @@ ctx.font = '900 48px -apple-system, sans-serif';
 ctx.fillText('FIGHT!', 0, 0);
 ctx.restore();
 }
-} else if (fightScene.phase === 'outro' && t < 90) {
+} else if (fightScene.phase === 'outro' && t < 95) {
 ctx.textAlign = 'center';
+if (fightScene.playerWins) {
 ctx.fillStyle = '#facc15';
 ctx.shadowColor = '#facc15';
 ctx.shadowBlur = 15;
 ctx.font = '900 40px -apple-system, sans-serif';
 ctx.fillText('ПОБЕДА!', canvas.width / 2, 86);
+} else {
+ctx.fillStyle = '#ef4444';
+ctx.shadowColor = '#ef4444';
+ctx.shadowBlur = 15;
+ctx.font = '900 36px -apple-system, sans-serif';
+ctx.fillText('ПОРАЖЕНИЕ!', canvas.width / 2, 86);
+}
 }
 for (let i = fightScene.sparks.length - 1; i >= 0; i--) {
 let s = fightScene.sparks[i];
@@ -1065,15 +1089,3 @@ let tiltAngle = 0.25;
 let drinkLiftY = 36;
 if (t >= 20 && t <= 155) {
 tiltAngle = 0.72 + Math.sin(t * 0.25) * 0.08;
-drinkLiftY = 44;
-}
-const progress = Math.max(0, Math.min(1, (t - 25) / 130));
-const liquidLevel = 0.85 - progress * 0.55;
-drawWhiskeyBottle(
-fx - (34 + slideOffset) * s,
-fy + (drinkLiftY + slideOffset * 0.5) * s,
-tiltAngle,
-s,
-liquidLevel
-);
-}
