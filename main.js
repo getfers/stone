@@ -663,60 +663,72 @@ const stream = canvas.captureStream(30);
 video.srcObject = stream;
 let docPipWindow = null;
 
+function mountCanvasToWindow(targetWin) {
+  const pipStyle = targetWin.document.createElement('style');
+  pipStyle.textContent = `
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #232529;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      touch-action: none;
+      cursor: grab;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+  `;
+  targetWin.document.head.appendChild(pipStyle);
+  targetWin.document.body.appendChild(canvas);
+
+  targetWin.addEventListener('pagehide', () => {
+    stage.appendChild(canvas);
+    docPipWindow = null;
+  });
+}
+
 btn.addEventListener('click', async () => {
   try {
-    // 1. Для ПК (Chrome / Edge / Яндекс): открываем живое интерактивное окно поверх всех окон
-    if ('documentPictureInPicture' in window && !/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    // 1. Для ПК (Яндекс Браузер, Chrome, Edge и др.): открываем живое интерактивное окно
+    if (!isIOS) {
       if (docPipWindow && !docPipWindow.closed) {
         docPipWindow.close();
         return;
       }
 
-      docPipWindow = await window.documentPictureInPicture.requestWindow({
-        width: 480,
-        height: 270
-      });
-
-      // Стили для живого плавающего окна на ПК
-      const pipStyle = docPipWindow.document.createElement('style');
-      pipStyle.textContent = `
-        html, body {
-          margin: 0;
-          padding: 0;
-          width: 100%;
-          height: 100%;
-          background: #232529;
-          overflow: hidden;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          user-select: none;
+      if ('documentPictureInPicture' in window) {
+        docPipWindow = await window.documentPictureInPicture.requestWindow({
+          width: 480,
+          height: 270
+        });
+        mountCanvasToWindow(docPipWindow);
+      } else {
+        // Запасной интерактивный режим для Яндекс Браузера на ПК
+        docPipWindow = window.open('', 'PetRockPiP', 'popup=yes,width=480,height=270,menubar=no,toolbar=no,location=no,status=no');
+        if (!docPipWindow) {
+          alert('Браузер заблокировал всплывающее окно. Разрешите всплывающие окна для этого сайта в адресной строке.');
+          return;
         }
-        canvas {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-          touch-action: none;
-          cursor: grab;
-        }
-        canvas:active {
-          cursor: grabbing;
-        }
-      `;
-      docPipWindow.document.head.appendChild(pipStyle);
-
-      // Переносим живой холст в плавающее окно
-      docPipWindow.document.body.appendChild(canvas);
-
-      // Возвращаем холст обратно на страницу при закрытии окна
-      docPipWindow.addEventListener('pagehide', () => {
-        stage.appendChild(canvas);
-        docPipWindow = null;
-      });
+        docPipWindow.document.title = 'Pet Rock';
+        mountCanvasToWindow(docPipWindow);
+      }
       return;
     }
 
-    // 2. Для iPhone (Safari): всё работает как раньше через видеопоток
+    // 2. Для iPhone (Safari): всё работает как раньше через видеопоток PiP
     await video.play();
     if (video.webkitSupportsPresentationMode && typeof video.webkitSetPresentationMode === "function") {
       video.webkitSetPresentationMode(video.webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture");
