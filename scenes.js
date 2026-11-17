@@ -920,24 +920,22 @@ function drawDrinkScene(fx, fy, s) {
   if (t < 20) slideOffset = (20 - t) * 4;
   if (t > 165) slideOffset = (t - 165) * 4;
 
-  // Угол 0.65 радиан (~37 градусов): горлышко смотрит вверх и вправо точно в рот
-  let tiltAngle = 0.15;
-  let drinkLiftY = 12;
+  // Угол 0.72 радиан (~41 градус): горлышко направлено снизу-слева точно в рот
+  let tiltAngle = 0.25;
+  let drinkLiftY = 36;
   if (t >= 20 && t <= 155) {
-    tiltAngle = 0.65 + Math.sin(t * 0.25) * 0.08;
-    drinkLiftY = 22;
+    tiltAngle = 0.72 + Math.sin(t * 0.25) * 0.08;
+    drinkLiftY = 44;
   }
 
   const progress = Math.max(0, Math.min(1, (t - 25) / 130));
   const liquidLevel = 0.85 - progress * 0.55;
 
   drawWhiskeyBottle(
-    fx - (28 + slideOffset) * s,
+    fx - (34 + slideOffset) * s,
     fy + (drinkLiftY + slideOffset * 0.5) * s,
     tiltAngle,
     s,
     liquidLevel
   );
 }
-
-
