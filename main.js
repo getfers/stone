@@ -13,16 +13,18 @@ let walker = { isWalking: false, targetX: 240, nextWalkTime: Date.now() + 1500 }
 let lastActivityTime = Date.now();
 let isBored = false;
 let hasDoneRandomAction = false;
-let showPlayMenu = false;
+
+// Состояния меню над головой: 'closed' (закрыто), 'prompt' (кнопка «Поиграй со мной!»), 'list' (список действий)
+let playMenuState = 'closed';
+let playMenuBounds = { x: 0, y: 0, w: 0, h: 0 };
+let actionButtonsBounds = [];
 
 function resetIdleTimer() {
   lastActivityTime = Date.now();
-  if (isBored || showPlayMenu || hasDoneRandomAction) {
-    isBored = false;
-    hasDoneRandomAction = false;
-    showPlayMenu = false;
-    currentEmotion = 0;
-  }
+  isBored = false;
+  hasDoneRandomAction = false;
+  playMenuState = 'closed';
+  if (currentEmotion === 2) currentEmotion = 0;
 }
 
 const NUM_POINTS = 16;
@@ -153,21 +155,43 @@ function getPos(e) {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
-  const wasMenuShown = showPlayMenu;
-  resetIdleTimer();
+  const pos = getPos(e);
 
-  // Если нажали на меню «Поиграй со мной!», питомец радостно подпрыгивает
-  if (wasMenuShown) {
-    currentEmotion = 1;
-    nextEmotionTime = Date.now() + 4000;
-    for (let i = 0; i < NUM_POINTS; i++) {
-      nodes[i].vy -= (nodes[i].oy < 0 ? 7 : 3);
+  // 1. Если открыта кнопка «▶ Поиграй со мной!»
+  if (playMenuState === 'prompt') {
+    const inMenuX = pos.x >= playMenuBounds.x - 10 && pos.x <= playMenuBounds.x + playMenuBounds.w + 10;
+    const inMenuY = pos.y >= playMenuBounds.y - 10 && pos.y <= playMenuBounds.y + playMenuBounds.h + 10;
+
+    if (inMenuX && inMenuY) {
+      // Раскрываем список действий над головой
+      playMenuState = 'list';
+      lastActivityTime = Date.now();
+      currentEmotion = 1;
+      for (let i = 0; i < NUM_POINTS; i++) {
+        nodes[i].vy -= (nodes[i].oy < 0 ? 5 : 2);
+      }
+      return;
+    } else {
+      resetIdleTimer();
     }
+  } 
+  // 2. Если раскрыто мини-меню со списком действий
+  else if (playMenuState === 'list') {
+    for (let item of actionButtonsBounds) {
+      if (pos.x >= item.x && pos.x <= item.x + item.w && pos.y >= item.y && pos.y <= item.y + item.h) {
+        resetIdleTimer();
+        item.action();
+        return;
+      }
+    }
+    // Если нажали мимо кнопок — закрываем меню
+    resetIdleTimer();
     return;
   }
 
+  resetIdleTimer();
+
   if (bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || drinkScene.active || sushiScene.active || life.state === 'dying') return;
-  const pos = getPos(e);
   if (Math.hypot(pos.x - center.x, pos.y - center.y) <= 95 * life.scale + 15) {
     isDragging = true;
     walker.isWalking = false;
@@ -231,7 +255,7 @@ function glideCharacterX(tx) {
 }
 
 function updateSlidingAI() {
-  if (isDragging || isAnySceneActive() || tiltEnabled) return;
+  if (isDragging || isAnySceneActive() || tiltEnabled || playMenuState === 'list') return;
 
   const now = Date.now();
   if (!walker.isWalking && now > walker.nextWalkTime) {
@@ -245,7 +269,7 @@ function updateSlidingAI() {
     if (Math.abs(distX) < 12) {
       walker.isWalking = false;
       walker.nextWalkTime = now + (isBored ? 4500 : 2000) + Math.random() * 3000;
-      if (!isBored && !showPlayMenu && Math.random() < 0.45) nextEmotion(1);
+      if (!isBored && playMenuState === 'closed' && Math.random() < 0.45) nextEmotion(1);
     } else if (center.y > canvas.height - 95) {
       const dir = Math.sign(distX);
       const speedMult = isBored ? 0.55 : 1.0;
@@ -285,32 +309,28 @@ function updateLiquidPhysics() {
       n.vy += gravity.y;
     }
 
-    n.vx += (center.x + n.ox - n.x) * STIFFNESS;
-    n.vy += (center.y + n.oy - n.y) * STIFFNESS;
-
-    n.vx += ((prev.x + next.x) * 0.5 - n.x) * NEIGHBOR_PULL;
-    n.vy += ((prev.y + next.y) * 0.5 - n.y) * NEIGHBOR_PULL;
-
-    n.vx *= DAMPING;
-    n.vy *= DAMPING;
-    n.x += n.vx;
-    n.y += n.vy;
-
-    if (n.y > canvas.height - MARGIN) {
-      if (n.vy > 11 && !isAnySceneActive() && !isBored && !showPlayMenu) nextEmotion(1);
-      n.y = canvas.height - MARGIN;
-      n.vy = -n.vy * 0.25;
-      n.vx *= (walker.isWalking || tiltEnabled || blocksScene.active || slideScene.active || fightScene.active) ? 0.94 : 0.82;
-    }
-    if (n.y < MARGIN) { n.y = MARGIN; n.vy = -n.vy * 0.45; }
-    if (n.x > canvas.width - MARGIN) { n.x = canvas.width - MARGIN; n.vx = -n.vx * 0.45; n.vy *= 0.85; }
-    if (n.x < MARGIN) { n.x = MARGIN; n.vx = -n.vx * 0.45; n.vy *= 0.85; }
-  }
+n.vx += (center.x + n.ox - n.x) * STIFFNESS;
+n.vy += (center.y + n.oy - n.y) * STIFFNESS;
+n.vx += ((prev.x + next.x) * 0.5 - n.x) * NEIGHBOR_PULL;
+n.vy += ((prev.y + next.y) * 0.5 - n.y) * NEIGHBOR_PULL;
+n.vx *= DAMPING;
+n.vy *= DAMPING;
+n.x += n.vx;
+n.y += n.vy;
+if (n.y > canvas.height - MARGIN) {
+if (n.vy > 11 && !isAnySceneActive() && !isBored && playMenuState === 'closed') nextEmotion(1);
+n.y = canvas.height - MARGIN;
+n.vy = -n.vy * 0.25;
+n.vx *= (walker.isWalking || tiltEnabled || blocksScene.active || slideScene.active || fightScene.active) ? 0.94 : 0.82;
 }
-
+if (n.y < MARGIN) { n.y = MARGIN; n.vy = -n.vy * 0.45; }
+if (n.x > canvas.width - MARGIN) { n.x = canvas.width - MARGIN; n.vx = -n.vx * 0.45; n.vy *= 0.85; }
+if (n.x < MARGIN) { n.x = MARGIN; n.vx = -n.vx * 0.45; n.vy *= 0.85; }
+}
+}
 function drawLiquidBody() {
-  ctx.beginPath();
-  for (let i = 0; i < NUM_POINTS; i++) {
+ctx.beginPath();
+for (let i = 0; i < NUM_POINTS; i++) {
 let curr = nodes[i];
 let next = nodes[(i + 1) % NUM_POINTS];
 let midX = (curr.x + next.x) * 0.5;
@@ -324,7 +344,7 @@ ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
 ctx.closePath();
 }
 function drawBoredIndicator(fx, fy, s, frame) {
-if (!isBored || showPlayMenu || isAnySceneActive()) return;
+if (!isBored || playMenuState !== 'closed' || isAnySceneActive()) return;
 ctx.save();
 const floatY = Math.sin(frame * 0.06) * 5;
 const bx = fx + 46 * s;
@@ -348,40 +368,112 @@ ctx.fill();
 }
 ctx.restore();
 }
-// Маленькое меню над головой «Поиграй со мной!»
 function drawPlayWithMeMenu(fx, fy, s, frame) {
-if (!showPlayMenu || isAnySceneActive()) return;
+if (playMenuState === 'closed' || isAnySceneActive()) return;
 ctx.save();
+// ВАРИАНТ 1: Компактная кнопка «▶ Поиграй со мной!»
+if (playMenuState === 'prompt') {
 const floatY = Math.sin(frame * 0.08) * 4;
-const boxW = 148 * s;
-const boxH = 30 * s;
-// Удерживаем плашку внутри экрана, чтобы не обрезалась у краев
+const boxW = 156 * s;
+const boxH = 32 * s;
 const clampedX = Math.max(boxW / 2 + 10, Math.min(canvas.width - boxW / 2 - 10, fx));
-const boxY = Math.max(boxH / 2 + 8, fy - 76 * s + floatY);
-// Небольшой хвостик-треугольник вниз к голове
-ctx.fillStyle = 'rgba(24, 24, 27, 0.92)';
+const boxY = Math.max(boxH / 2 + 8, fy - 78 * s + floatY);
+playMenuBounds = {
+x: clampedX - boxW / 2,
+y: boxY - boxH / 2,
+w: boxW,
+h: boxH
+};
+ctx.fillStyle = 'rgba(24, 24, 27, 0.94)';
 ctx.beginPath();
 ctx.moveTo(clampedX - 6 * s, boxY + boxH / 2 - 1);
 ctx.lineTo(clampedX + 6 * s, boxY + boxH / 2 - 1);
 ctx.lineTo(clampedX, boxY + boxH / 2 + 7 * s);
 ctx.closePath();
 ctx.fill();
-// Основная капсула меню с синей подсветкой
-ctx.shadowColor = 'rgba(59, 130, 246, 0.45)';
-ctx.shadowBlur = 10;
+const pulse = 0.6 + Math.sin(frame * 0.1) * 0.4;
+ctx.shadowColor = 'rgba(59, 130, 246, ' + pulse.toFixed(2) + ')';
+ctx.shadowBlur = 12;
 ctx.strokeStyle = '#3b82f6';
-ctx.lineWidth = 2;
+ctx.lineWidth = 2.2;
 ctx.beginPath();
-ctx.roundRect(clampedX - boxW / 2, boxY - boxH / 2, boxW, boxH, 12 * s);
+ctx.roundRect(playMenuBounds.x, playMenuBounds.y, boxW, boxH, 12 * s);
 ctx.fill();
 ctx.stroke();
-// Текст внутри меню
 ctx.shadowBlur = 0;
 ctx.fillStyle = '#ffffff';
 ctx.font = 'bold ' + Math.round(12.5 * s) + 'px -apple-system, sans-serif';
 ctx.textAlign = 'center';
 ctx.textBaseline = 'middle';
-ctx.fillText('Поиграй со мной!', clampedX, boxY + 0.5);
+ctx.fillText('▶ Поиграй со мной!', clampedX, boxY + 0.5);
+}
+// ВАРИАНТ 2: Раскрывшееся меню с выбором из 6 действий
+else if (playMenuState === 'list') {
+const items = [
+{ label: 'Попарить', action: startVape },
+{ label: 'Выпить', action: startDrinkScene },
+{ label: 'Роллы', action: startSushiScene },
+{ label: 'Кубики', action: startBlocksScene },
+{ label: 'Горка', action: startSlideScene },
+{ label: 'Бой', action: startFightScene }
+];
+const cols = 3;
+const rows = 2;
+const btnW = 74;
+const btnH = 26;
+const gap = 6;
+const pad = 8;
+const panelW = cols * btnW + (cols - 1) * gap + pad * 2;
+const panelH = rows * btnH + (rows - 1) * gap + pad * 2;
+const panelX = Math.max(10, Math.min(canvas.width - panelW - 10, fx - panelW / 2));
+const panelY = Math.max(8, fy - 68 * s - panelH);
+// Подложка панели
+ctx.fillStyle = 'rgba(24, 24, 27, 0.95)';
+ctx.strokeStyle = '#3b82f6';
+ctx.lineWidth = 2;
+ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+ctx.shadowBlur = 14;
+ctx.beginPath();
+ctx.roundRect(panelX, panelY, panelW, panelH, 14);
+ctx.fill();
+ctx.stroke();
+// Треугольный указатель вниз к камушку
+const pointerX = Math.max(panelX + 16, Math.min(panelX + panelW - 16, fx));
+ctx.shadowBlur = 0;
+ctx.beginPath();
+ctx.moveTo(pointerX - 6, panelY + panelH - 1);
+ctx.lineTo(pointerX + 6, panelY + panelH - 1);
+ctx.lineTo(pointerX, panelY + panelH + 7);
+ctx.closePath();
+ctx.fill();
+// Отрисовка 6 кнопок внутри панели
+actionButtonsBounds = [];
+ctx.font = '600 11.5px -apple-system, sans-serif';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+for (let i = 0; i < items.length; i++) {
+const r = Math.floor(i / cols);
+const c = i % cols;
+const bx = panelX + pad + c * (btnW + gap);
+const by = panelY + pad + r * (btnH + gap);
+actionButtonsBounds.push({
+x: bx,
+y: by,
+w: btnW,
+h: btnH,
+action: items[i].action
+});
+ctx.fillStyle = '#2b2d33';
+ctx.strokeStyle = '#525660';
+ctx.lineWidth = 1.2;
+ctx.beginPath();
+ctx.roundRect(bx, by, btnW, btnH, 8);
+ctx.fill();
+ctx.stroke();
+ctx.fillStyle = '#f4f4f5';
+ctx.fillText(items[i].label, bx + btnW / 2, by + btnH / 2 + 0.5);
+}
+}
 ctx.restore();
 }
 function triggerRandomIdleActivity() {
@@ -409,9 +501,8 @@ const now = Date.now();
 if (!isAnySceneActive() && !isDragging && life.state === 'alive') {
 const idleTime = now - lastActivityTime;
 if (hasDoneRandomAction) {
-// Через 10 секунд после случайного действия появляется меню над головой
-if (idleTime >= 10000 && !showPlayMenu) {
-showPlayMenu = true;
+if (idleTime >= 10000 && playMenuState === 'closed') {
+playMenuState = 'prompt';
 currentEmotion = 2;
 }
 } else {
@@ -427,7 +518,7 @@ currentEmotion = 2;
 } else if (isAnySceneActive()) {
 lastActivityTime = now;
 isBored = false;
-showPlayMenu = false;
+playMenuState = 'closed';
 }
 if (isBored && !isAnySceneActive() && (frame % 150 === 0)) {
 for (let i = 0; i < NUM_POINTS; i++) {
@@ -443,7 +534,7 @@ else if (sushiScene.active) updateSushiScene();
 else if (sushiGame.active) updateSushiGame();
 else updateSlidingAI();
 updateLiquidPhysics();
-if (!isAnySceneActive() && !isDragging && !isBored && !showPlayMenu && now > nextEmotionTime) {
+if (!isAnySceneActive() && !isDragging && !isBored && playMenuState === 'closed' && now > nextEmotionTime) {
 nextEmotion(1);
 }
 ctx.fillStyle = '#232529';
