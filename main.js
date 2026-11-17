@@ -10,6 +10,17 @@ let nextEmotionTime = Date.now() + 5000 + Math.random() * 4000;
 
 let walker = { isWalking: false, targetX: 240, nextWalkTime: Date.now() + 1500 };
 
+let lastActivityTime = Date.now();
+let isBored = false;
+
+function resetIdleTimer() {
+  lastActivityTime = Date.now();
+  if (isBored) {
+    isBored = false;
+    currentEmotion = 0;
+  }
+}
+
 const NUM_POINTS = 16;
 let nodes = [];
 let center = { x: 240, y: 155, vx: 0, vy: 0 };
@@ -56,6 +67,7 @@ function nextEmotion(step) {
 }
 
 function pokeJelly(step) {
+  resetIdleTimer();
   if (isAnySceneActive() && !vape.active) return;
   if (typeof step !== 'number') step = 1;
   walker.isWalking = false;
@@ -86,6 +98,7 @@ function handleMotion(e) {
 }
 
 tiltBtn.addEventListener('click', async () => {
+  resetIdleTimer();
   if (!tiltEnabled) {
     try {
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -120,6 +133,10 @@ tiltBtn.addEventListener('click', async () => {
   }
 });
 
+document.querySelectorAll('button').forEach(b => {
+  b.addEventListener('click', resetIdleTimer);
+});
+
 function getPos(e) {
   const rect = canvas.getBoundingClientRect();
   const clientX = (e.touches && e.touches.length > 0) ? e.touches.clientX : e.clientX;
@@ -131,7 +148,8 @@ function getPos(e) {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
-  if (bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || life.state === 'dying') return;
+  resetIdleTimer();
+  if (bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || drinkScene.active || life.state === 'dying') return;
   const pos = getPos(e);
   if (Math.hypot(pos.x - center.x, pos.y - center.y) <= 95 * life.scale + 15) {
     isDragging = true;
@@ -146,7 +164,8 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
-  if (!isDragging || bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || life.state === 'dying') return;
+  if (!isDragging || bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || drinkScene.active || life.state === 'dying') return;
+  resetIdleTimer();
   const pos = getPos(e);
   const dx = pos.x - lastPointer.x;
   const dy = pos.y - lastPointer.y;
@@ -208,11 +227,12 @@ function updateSlidingAI() {
     const distX = walker.targetX - center.x;
     if (Math.abs(distX) < 12) {
       walker.isWalking = false;
-      walker.nextWalkTime = now + 2000 + Math.random() * 3000;
-      if (Math.random() < 0.45) nextEmotion(1);
+      walker.nextWalkTime = now + (isBored ? 4500 : 2000) + Math.random() * 3000;
+      if (!isBored && Math.random() < 0.45) nextEmotion(1);
     } else if (center.y > canvas.height - 95) {
       const dir = Math.sign(distX);
-      const glideSpeed = dir > 0 ? 0.42 : 0.36;
+      const speedMult = isBored ? 0.55 : 1.0;
+      const glideSpeed = (dir > 0 ? 0.42 : 0.36) * speedMult;
       for (let i = 0; i < NUM_POINTS; i++) {
         const lean = nodes[i].oy < 0 ? 1.15 : 0.9;
         nodes[i].vx += dir * glideSpeed * lean;
@@ -260,7 +280,7 @@ function updateLiquidPhysics() {
     n.y += n.vy;
 
     if (n.y > canvas.height - MARGIN) {
-      if (n.vy > 11 && !isAnySceneActive()) nextEmotion(1);
+      if (n.vy > 11 && !isAnySceneActive() && !isBored) nextEmotion(1);
       n.y = canvas.height - MARGIN;
       n.vy = -n.vy * 0.25;
       n.vx *= (walker.isWalking || tiltEnabled || blocksScene.active || slideScene.active || fightScene.active) ? 0.94 : 0.82;
@@ -287,33 +307,80 @@ function drawLiquidBody() {
   ctx.closePath();
 }
 
+function drawBoredIndicator(fx, fy, s, frame) {if (!isBored || isAnySceneActive()) return;
+ctx.save();
+const floatY = Math.sin(frame * 0.06) * 5;
+const bx = fx + 46 * s;
+const by = fy - 48 * s + floatY;
+ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
+ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+ctx.lineWidth = 1.5;
+ctx.beginPath();
+ctx.arc(fx + 28 * s, fy - 32 * s + floatY * 0.5, 3 * s, 0, Math.PI * 2);
+ctx.fill();
+ctx.beginPath();
+ctx.roundRect(bx - 18 * s, by - 11 * s, 36 * s, 22 * s, 10 * s);
+ctx.fill();
+ctx.stroke();
+const activeDot = Math.floor(frame / 25) % 3;
+for (let d = 0; d < 3; d++) {
+ctx.fillStyle = d === activeDot ? '#ffffff' : 'rgba(255, 255, 255, 0.4)';
+ctx.beginPath();
+ctx.arc(bx - 8 * s + d * 8 * s, by, 2.2 * s, 0, Math.PI * 2);
+ctx.fill();
+}
+ctx.restore();
+}
+function triggerRandomIdleActivity() {
+const activities = [startVape, startDrinkScene, startBlocksScene, startSlideScene];
+const randomAction = activities[Math.floor(Math.random() * activities.length)];
+randomAction();
+}
 let frame = 0;
-
 function drawCharacter() {
-  if (life.state === 'reborn') {
-    life.timer++;
-    if (life.scale < 1.0) {
-      life.scale = Math.min(1.0, life.scale + 0.0022);
-      updateNodeScale(life.scale);
-    } else {
-      life.state = 'alive';
-      walker.nextWalkTime = Date.now() + 1500;
-    }
-  }
-
-  if (!vape.active && life.state === 'alive' && vape.blueLevel > 0) {
-    vape.blueLevel = Math.max(0, vape.blueLevel - 0.0004);
-  }
-
-  if (bulbScene.active) updateBulbScene();
-  else if (blocksScene.active) updateBlocksScene();
-  else if (slideScene.active) updateSlideScene();
+if (life.state === 'reborn') {
+life.timer++;
+if (life.scale < 1.0) {
+life.scale = Math.min(1.0, life.scale + 0.0022);
+updateNodeScale(life.scale);
+} else {
+life.state = 'alive';
+walker.nextWalkTime = Date.now() + 1500;
+}
+}
+if (!vape.active && life.state === 'alive' && vape.blueLevel > 0) {
+vape.blueLevel = Math.max(0, vape.blueLevel - 0.0004);
+}
+const now = Date.now();
+if (!isAnySceneActive() && !isDragging && life.state === 'alive') {
+const idleTime = now - lastActivityTime;
+if (idleTime >= 60000) {
+isBored = false;
+lastActivityTime = now;
+triggerRandomIdleActivity();
+} else if (idleTime >= 30000 && !isBored) {
+isBored = true;
+currentEmotion = 2;
+}
+} else if (isAnySceneActive()) {
+lastActivityTime = now;
+isBored = false;
+}
+if (isBored && !isAnySceneActive() && (frame % 150 === 0)) {
+for (let i = 0; i < NUM_POINTS; i++) {
+if (nodes[i].oy < 0) nodes[i].vy += 4.2;
+}
+}
+if (bulbScene.active) updateBulbScene();
+else if (blocksScene.active) updateBlocksScene();
+else if (slideScene.active) updateSlideScene();
 else if (fightScene.active) updateFightScene();
+else if (drinkScene.active) updateDrinkScene();
 else updateSlidingAI();
 updateLiquidPhysics();
-const now = Date.now();
-if (!isAnySceneActive() && !isDragging && now > nextEmotionTime) nextEmotion(1);
-if (!isAnySceneActive() && !isDragging && !walker.isWalking && now > vape.nextAutoTime) startVape();
+if (!isAnySceneActive() && !isDragging && !isBored && now > nextEmotionTime) {
+nextEmotion(1);
+}
 ctx.fillStyle = '#232529';
 ctx.fillRect(0, 0, canvas.width, canvas.height);
 drawLadder();
@@ -327,7 +394,6 @@ return;
 }
 const s = life.scale;
 const shiverX = vape.blueLevel > 0.65 ? (Math.random() - 0.5) * 3 : 0;
-// Гладкое белое 3D-тело без грубой черной обводки
 drawLiquidBody();
 ctx.fillStyle = getBodyColor(vape.blueLevel);
 ctx.fill();
@@ -335,10 +401,11 @@ const lookX = Math.max(-11 * s, Math.min(11 * s, center.vx * 1.4)) + shiverX;
 const lookY = Math.max(-9 * s, Math.min(9 * s, center.vy * 0.65));
 const fx = center.x + lookX;
 const fy = center.y + lookY;
-// Объёмная светотень и углубления под глаза
 drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody);
 const emo = emotions[currentEmotion];
-const isBlinking = (frame % 170) > 162 && emo !== 'surprised';
+const isBlinking = isBored
+? ((frame % 130) > 110)
+: ((frame % 170) > 162 && emo !== 'surprised');
 ctx.strokeStyle = 'rgba(24, 24, 27, 0.75)';
 ctx.lineWidth = Math.max(2.5, 4.5 * s);
 ctx.lineCap = 'round';
@@ -387,7 +454,14 @@ walker.nextWalkTime = Date.now() + 2000;
 }
 } else {
 const bulbLookOffset = (bulbScene.active && bulbScene.timer > 110 && bulbScene.timer < 295) ? -4.5 : 0;
-if (emo === 'classic') {
+if (drinkScene.active) {
+const isDrinking = drinkScene.timer >= 20 && drinkScene.timer <= 155;
+drawGlossyEyes(ctx, fx, fy, s, lookX, isDrinking ? -2 : 0, isDrinking, false);
+ctx.fillStyle = '#18181b';
+ctx.beginPath();
+ctx.arc(fx - 10 * s, fy + 25 * s, (isDrinking ? 6.5 : 4.5) * s, 0, Math.PI * 2);
+ctx.fill();
+} else if (emo === 'classic') {
 drawGlossyEyes(ctx, fx, fy, s, lookX, bulbLookOffset, isBlinking, isBlinking);
 } else if (emo === 'happy') {
 drawGlossyEyes(ctx, fx, fy, s, lookX, -2.5 + bulbLookOffset, isBlinking, isBlinking);
@@ -401,9 +475,11 @@ ctx.fillStyle = '#18181b';
 ctx.beginPath(); ctx.ellipse(fx, fy + 26 * s, 7 * s, 9 * s, 0, 0, Math.PI * 2); ctx.fill();
 }
 }
+drawBoredIndicator(fx, fy, s, frame);
 drawBlocks();
 drawBulbAndSocket();
 drawFightScene();
+drawDrinkScene(fx, fy, s);
 updateAndDrawVapor();
 frame++;
 requestAnimationFrame(drawCharacter);
