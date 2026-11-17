@@ -1,165 +1,116 @@
-const costumes = ['none', 'joker', 'batman', 'chucky', 'myers'];
-const costumeNames = ['Нет', 'Джокер', 'Бэтмен', 'Чаки', 'Майерс'];
+const costumes = ['glossy'];
 let currentCostume = 0;
 
-function nextCostume() {
-  currentCostume = (currentCostume + 1) % costumes.length;
-  const btn = document.getElementById('costumeBtn');
-  if (btn) btn.textContent = 'Костюм: ' + costumeNames[currentCostume];
-  for (let i = 0; i < NUM_POINTS; i++) {
-    nodes[i].vy -= (nodes[i].oy < 0 ? 5 : 2);
-  }
-}
-
 function getBodyColor(blueRatio) {
-  const costume = costumes[currentCostume];
-  let baseR = 117, baseG = 121, baseB = 130;
-
-  if (costume === 'joker') {
-    baseR = 232; baseG = 234; baseB = 237;
-  } else if (costume === 'batman') {
-    baseR = 39; baseG = 41; baseB = 48;
-  } else if (costume === 'chucky') {
-    baseR = 235; baseG = 195; baseB = 165;
-  } else if (costume === 'myers') {
-    baseR = 238; baseG = 238; baseB = 240;
-  }
-
+  // Гладкий светло-серый/белый базовый оттенок 3D-шара
+  const baseR = 236, baseG = 238, baseB = 242;
   const r = Math.round(baseR + (37 - baseR) * blueRatio);
   const g = Math.round(baseG + (99 - baseG) * blueRatio);
   const b = Math.round(baseB + (235 - baseB) * blueRatio);
   return 'rgb(' + r + ',' + g + ',' + b + ')';
 }
 
-function drawBatmanCape(ctx, center, s, frame) {
-  if (costumes[currentCostume] !== 'batman') return;
+// Объемная 3D-светотень и глубокие глазницы внутри тела
+function drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody) {
   ctx.save();
-  ctx.fillStyle = '#18181b';
-  ctx.strokeStyle = '#111214';
-  ctx.lineWidth = Math.max(2, 4 * s);
-  const capeWave = Math.sin(frame * 0.12) * 6 * s - center.vx * 2;
+  drawLiquidBody();
+  ctx.clip();
+
+  // Объемный градиент для эффекта гладкого матового пластика/керамики
+  const grad = ctx.createRadialGradient(
+    center.x - 20 * s, center.y - 28 * s, 8 * s,
+    center.x, center.y, 78 * s
+  );
+  grad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+  grad.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
+  grad.addColorStop(1, 'rgba(20, 22, 28, 0.38)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(center.x - 100 * s, center.y - 100 * s, 200 * s, 200 * s);
+
+  // Мягкие углубления (глазницы), как на картинке
+  const leftSocket = ctx.createRadialGradient(fx - 19 * s, fy - 4 * s, 8 * s, fx - 19 * s, fy - 4 * s, 25 * s);
+  leftSocket.addColorStop(0, 'rgba(15, 17, 22, 0.35)');
+  leftSocket.addColorStop(0.75, 'rgba(15, 17, 22, 0.12)');
+  leftSocket.addColorStop(1, 'rgba(15, 17, 22, 0)');
+  ctx.fillStyle = leftSocket;
   ctx.beginPath();
-  ctx.moveTo(center.x - 35 * s, center.y - 10 * s);
-  ctx.lineTo(center.x - 62 * s + capeWave, center.y + 48 * s);
-  ctx.lineTo(center.x + 62 * s + capeWave, center.y + 48 * s);
-  ctx.lineTo(center.x + 35 * s, center.y - 10 * s);
-  ctx.closePath();
+  ctx.arc(fx - 19 * s, fy - 4 * s, 25 * s, 0, Math.PI * 2);
   ctx.fill();
-  ctx.stroke();
+
+  const rightSocket = ctx.createRadialGradient(fx + 19 * s, fy - 4 * s, 8 * s, fx + 19 * s, fy - 4 * s, 25 * s);
+  rightSocket.addColorStop(0, 'rgba(15, 17, 22, 0.35)');
+  rightSocket.addColorStop(0.75, 'rgba(15, 17, 22, 0.12)');
+  rightSocket.addColorStop(1, 'rgba(15, 17, 22, 0)');
+  ctx.fillStyle = rightSocket;
+  ctx.beginPath();
+  ctx.arc(fx + 19 * s, fy - 4 * s, 25 * s, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.restore();
 }
 
-function drawCostumeDetails(ctx, center, fx, fy, s, drawLiquidBody) {
-  const costume = costumes[currentCostume];
-  if (costume === 'none') return;
+// Большие глянцевые черные глаза со стеклянным бликом
+function drawGlossyEyes(ctx, fx, fy, s, lookX, pupilOffsetY, leftClosed, rightClosed) {
+  const eyePositions = [
+    { x: fx - 19 * s, y: fy - 4 * s, closed: leftClosed },
+    { x: fx + 19 * s, y: fy - 4 * s, closed: rightClosed }
+  ];
 
-  ctx.save();
-
-  if (costume === 'joker') {
-    ctx.fillStyle = '#16a34a';
-    ctx.strokeStyle = '#111214';
-    ctx.lineWidth = Math.max(2, 4 * s);
-    ctx.beginPath();
-    ctx.moveTo(fx - 46 * s, fy - 35 * s);
-    ctx.quadraticCurveTo(fx - 54 * s, fy - 62 * s, fx - 28 * s, fy - 58 * s);
-    ctx.quadraticCurveTo(fx - 10 * s, fy - 72 * s, fx + 5 * s, fy - 58 * s);
-    ctx.quadraticCurveTo(fx + 32 * s, fy - 66 * s, fx + 44 * s, fy - 35 * s);
-    ctx.quadraticCurveTo(fx + 15 * s, fy - 45 * s, fx - 5 * s, fy - 42 * s);
-    ctx.quadraticCurveTo(fx - 25 * s, fy - 45 * s, fx - 46 * s, fy - 35 * s);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#7e22ce';
-    ctx.beginPath();
-    ctx.moveTo(fx - 5 * s, fy + 45 * s);
-    ctx.lineTo(fx - 19 * s, fy + 38 * s);
-    ctx.lineTo(fx - 19 * s, fy + 52 * s);
-    ctx.closePath();
-    ctx.moveTo(fx - 5 * s, fy + 45 * s);
-    ctx.lineTo(fx + 9 * s, fy + 38 * s);
-    ctx.lineTo(fx + 9 * s, fy + 52 * s);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-  } else if (costume === 'batman') {
-    ctx.fillStyle = '#272930';
-    ctx.strokeStyle = '#111214';
-    ctx.lineWidth = Math.max(2.5, 5 * s);
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(fx - 42 * s, fy - 38 * s);
-    ctx.lineTo(fx - 36 * s, fy - 78 * s);
-    ctx.lineTo(fx - 20 * s, fy - 52 * s);
-    ctx.moveTo(fx + 16 * s, fy - 52 * s);
-    ctx.lineTo(fx + 32 * s, fy - 78 * s);
-    ctx.lineTo(fx + 38 * s, fy - 38 * s);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#e5c1a3';
-    ctx.beginPath();
-    ctx.ellipse(fx - 4 * s, fy + 20 * s, 32 * s, 21 * s, 0.08, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineWidth = Math.max(1.5, 3 * s);
-    ctx.stroke();
-  } else if (costume === 'chucky') {
-    ctx.fillStyle = '#ea580c';
-    ctx.strokeStyle = '#111214';
-    ctx.lineWidth = Math.max(2, 4 * s);
-    ctx.beginPath();
-    ctx.moveTo(fx - 48 * s, fy - 25 * s);
-    ctx.quadraticCurveTo(fx - 45 * s, fy - 68 * s, fx, fy - 66 * s);
-    ctx.quadraticCurveTo(fx + 45 * s, fy - 68 * s, fx + 46 * s, fy - 25 * s);
-    ctx.lineTo(fx + 28 * s, fy - 42 * s);
-    ctx.lineTo(fx + 14 * s, fy - 34 * s);
-    ctx.lineTo(fx, fy - 44 * s);
-    ctx.lineTo(fx - 18 * s, fy - 33 * s);
-    ctx.lineTo(fx - 32 * s, fy - 42 * s);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#c2410c';
-    ctx.beginPath();
-    ctx.arc(fx - 26 * s, fy + 3 * s, 1.8 * s, 0, Math.PI * 2);
-    ctx.arc(fx - 21 * s, fy + 6 * s, 1.8 * s, 0, Math.PI * 2);
-    ctx.arc(fx + 18 * s, fy + 5 * s, 1.8 * s, 0, Math.PI * 2);
-    ctx.arc(fx + 23 * s, fy + 2 * s, 1.8 * s, 0, Math.PI * 2);
-    ctx.fill();
-
+  for (let eye of eyePositions) {
     ctx.save();
-    drawLiquidBody();
-    ctx.clip();
-    ctx.fillStyle = '#2563eb';
-    ctx.fillRect(center.x - 75 * s, fy + 33 * s, 150 * s, 45 * s);
-    ctx.fillRect(fx - 30 * s, fy + 16 * s, 10 * s, 22 * s);
-    ctx.fillRect(fx + 16 * s, fy + 16 * s, 10 * s, 22 * s);
-    ctx.fillStyle = '#ef4444';
+    const rx = 16.5 * s;
+    const ry = (eye.closed ? 2.5 : 17.5) * s;
+
+    // Светлый ободок вокруг глазницы
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.lineWidth = Math.max(1.5, 2.5 * s);
     ctx.beginPath();
-    ctx.arc(fx - 25 * s, fy + 35 * s, 3 * s, 0, Math.PI * 2);
-    ctx.arc(fx + 21 * s, fy + 35 * s, 3 * s, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  } else if (costume === 'myers') {
-    ctx.fillStyle = '#451a03';
-    ctx.strokeStyle = '#111214';
-    ctx.lineWidth = Math.max(2, 4 * s);
-    ctx.beginPath();
-    ctx.moveTo(fx - 46 * s, fy - 24 * s);
-    ctx.quadraticCurveTo(fx - 42 * s, fy - 66 * s, fx, fy - 64 * s);
-    ctx.quadraticCurveTo(fx + 42 * s, fy - 66 * s, fx + 44 * s, fy - 24 * s);
-    ctx.quadraticCurveTo(fx + 20 * s, fy - 46 * s, fx, fy - 44 * s);
-    ctx.quadraticCurveTo(fx - 20 * s, fy - 46 * s, fx - 46 * s, fy - 24 * s);
-    ctx.fill();
+    ctx.ellipse(eye.x, eye.y + 1.5 * s, rx + 1.5 * s, ry + 1.5 * s, 0, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.save();
-    drawLiquidBody();
-    ctx.clip();
-    ctx.fillStyle = '#1e3a8a';
-    ctx.fillRect(center.x - 75 * s, fy + 38 * s, 150 * s, 40 * s);
+    // Глубокий черный глянцевый шар глаза
+    const eyeGrad = ctx.createRadialGradient(
+      eye.x - 4 * s + lookX * 0.25,
+      eye.y - 5 * s + pupilOffsetY * s,
+      2 * s,
+      eye.x,
+      eye.y,
+      rx
+    );
+    eyeGrad.addColorStop(0, '#27272a');
+    eyeGrad.addColorStop(0.5, '#09090b');
+    eyeGrad.addColorStop(1, '#000000');
+
+    ctx.fillStyle = eyeGrad;
+    ctx.beginPath();
+    ctx.ellipse(eye.x, eye.y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (!eye.closed) {
+      // Верхний полупрозрачный стеклянный блик (как на фото)
+      const gloss = ctx.createLinearGradient(eye.x, eye.y - ry, eye.x, eye.y);
+      gloss.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+      gloss.addColorStop(1, 'rgba(255, 255, 255, 0.02)');
+      ctx.fillStyle = gloss;
+      ctx.beginPath();
+      ctx.ellipse(
+        eye.x - 2 * s + lookX * 0.2,
+        eye.y - 6.5 * s + pupilOffsetY * 0.5 * s,
+        10.5 * s,
+        6.5 * s,
+        -0.25,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      // Яркая точечная искра блика
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.beginPath();
+      ctx.arc(eye.x - 6 * s + lookX * 0.2, eye.y - 7 * s + pupilOffsetY * 0.5 * s, 2.5 * s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.restore();
   }
-
-  ctx.restore();
 }
