@@ -12,11 +12,15 @@ let walker = { isWalking: false, targetX: 240, nextWalkTime: Date.now() + 1500 }
 
 let lastActivityTime = Date.now();
 let isBored = false;
+let hasDoneRandomAction = false;
+let showPlayMenu = false;
 
 function resetIdleTimer() {
   lastActivityTime = Date.now();
-  if (isBored) {
+  if (isBored || showPlayMenu || hasDoneRandomAction) {
     isBored = false;
+    hasDoneRandomAction = false;
+    showPlayMenu = false;
     currentEmotion = 0;
   }
 }
@@ -149,7 +153,19 @@ function getPos(e) {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
+  const wasMenuShown = showPlayMenu;
   resetIdleTimer();
+
+  // Если нажали на меню «Поиграй со мной!», питомец радостно подпрыгивает
+  if (wasMenuShown) {
+    currentEmotion = 1;
+    nextEmotionTime = Date.now() + 4000;
+    for (let i = 0; i < NUM_POINTS; i++) {
+      nodes[i].vy -= (nodes[i].oy < 0 ? 7 : 3);
+    }
+    return;
+  }
+
   if (bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || drinkScene.active || sushiScene.active || life.state === 'dying') return;
   const pos = getPos(e);
   if (Math.hypot(pos.x - center.x, pos.y - center.y) <= 95 * life.scale + 15) {
@@ -229,7 +245,7 @@ function updateSlidingAI() {
     if (Math.abs(distX) < 12) {
       walker.isWalking = false;
       walker.nextWalkTime = now + (isBored ? 4500 : 2000) + Math.random() * 3000;
-      if (!isBored && Math.random() < 0.45) nextEmotion(1);
+      if (!isBored && !showPlayMenu && Math.random() < 0.45) nextEmotion(1);
     } else if (center.y > canvas.height - 95) {
       const dir = Math.sign(distX);
       const speedMult = isBored ? 0.55 : 1.0;
@@ -281,7 +297,7 @@ function updateLiquidPhysics() {
     n.y += n.vy;
 
     if (n.y > canvas.height - MARGIN) {
-      if (n.vy > 11 && !isAnySceneActive() && !isBored) nextEmotion(1);
+      if (n.vy > 11 && !isAnySceneActive() && !isBored && !showPlayMenu) nextEmotion(1);
       n.y = canvas.height - MARGIN;
       n.vy = -n.vy * 0.25;
       n.vx *= (walker.isWalking || tiltEnabled || blocksScene.active || slideScene.active || fightScene.active) ? 0.94 : 0.82;
@@ -295,23 +311,21 @@ function updateLiquidPhysics() {
 function drawLiquidBody() {
   ctx.beginPath();
   for (let i = 0; i < NUM_POINTS; i++) {
-    let curr = nodes[i];
-    let next = nodes[(i + 1) % NUM_POINTS];
-    let midX = (curr.x + next.x) * 0.5;
-    let midY = (curr.y + next.y) * 0.5;
-    if (i === 0) {
-      let prev = nodes[NUM_POINTS - 1];
-      ctx.moveTo((prev.x + curr.x) * 0.5, (prev.y + curr.y) * 0.5);
-    }
-    ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
-  }
-  ctx.closePath();
+let curr = nodes[i];
+let next = nodes[(i + 1) % NUM_POINTS];
+let midX = (curr.x + next.x) * 0.5;
+let midY = (curr.y + next.y) * 0.5;
+if (i === 0) {
+let prev = nodes[NUM_POINTS - 1];
+ctx.moveTo((prev.x + curr.x) * 0.5, (prev.y + curr.y) * 0.5);
 }
-
+ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
+}
+ctx.closePath();
+}
 function drawBoredIndicator(fx, fy, s, frame) {
-  if (!isBored || isAnySceneActive()) return;
-
-  ctx.save();
+if (!isBored || showPlayMenu || isAnySceneActive()) return;
+ctx.save();
 const floatY = Math.sin(frame * 0.06) * 5;
 const bx = fx + 46 * s;
 const by = fy - 48 * s + floatY;
@@ -334,7 +348,44 @@ ctx.fill();
 }
 ctx.restore();
 }
+// Маленькое меню над головой «Поиграй со мной!»
+function drawPlayWithMeMenu(fx, fy, s, frame) {
+if (!showPlayMenu || isAnySceneActive()) return;
+ctx.save();
+const floatY = Math.sin(frame * 0.08) * 4;
+const boxW = 148 * s;
+const boxH = 30 * s;
+// Удерживаем плашку внутри экрана, чтобы не обрезалась у краев
+const clampedX = Math.max(boxW / 2 + 10, Math.min(canvas.width - boxW / 2 - 10, fx));
+const boxY = Math.max(boxH / 2 + 8, fy - 76 * s + floatY);
+// Небольшой хвостик-треугольник вниз к голове
+ctx.fillStyle = 'rgba(24, 24, 27, 0.92)';
+ctx.beginPath();
+ctx.moveTo(clampedX - 6 * s, boxY + boxH / 2 - 1);
+ctx.lineTo(clampedX + 6 * s, boxY + boxH / 2 - 1);
+ctx.lineTo(clampedX, boxY + boxH / 2 + 7 * s);
+ctx.closePath();
+ctx.fill();
+// Основная капсула меню с синей подсветкой
+ctx.shadowColor = 'rgba(59, 130, 246, 0.45)';
+ctx.shadowBlur = 10;
+ctx.strokeStyle = '#3b82f6';
+ctx.lineWidth = 2;
+ctx.beginPath();
+ctx.roundRect(clampedX - boxW / 2, boxY - boxH / 2, boxW, boxH, 12 * s);
+ctx.fill();
+ctx.stroke();
+// Текст внутри меню
+ctx.shadowBlur = 0;
+ctx.fillStyle = '#ffffff';
+ctx.font = 'bold ' + Math.round(12.5 * s) + 'px -apple-system, sans-serif';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText('Поиграй со мной!', clampedX, boxY + 0.5);
+ctx.restore();
+}
 function triggerRandomIdleActivity() {
+hasDoneRandomAction = true;
 const activities = [startVape, startDrinkScene, startSushiScene, startBlocksScene, startSlideScene];
 const randomAction = activities[Math.floor(Math.random() * activities.length)];
 randomAction();
@@ -357,6 +408,13 @@ vape.blueLevel = Math.max(0, vape.blueLevel - 0.0004);
 const now = Date.now();
 if (!isAnySceneActive() && !isDragging && life.state === 'alive') {
 const idleTime = now - lastActivityTime;
+if (hasDoneRandomAction) {
+// Через 10 секунд после случайного действия появляется меню над головой
+if (idleTime >= 10000 && !showPlayMenu) {
+showPlayMenu = true;
+currentEmotion = 2;
+}
+} else {
 if (idleTime >= 60000) {
 isBored = false;
 lastActivityTime = now;
@@ -365,9 +423,11 @@ triggerRandomIdleActivity();
 isBored = true;
 currentEmotion = 2;
 }
+}
 } else if (isAnySceneActive()) {
 lastActivityTime = now;
 isBored = false;
+showPlayMenu = false;
 }
 if (isBored && !isAnySceneActive() && (frame % 150 === 0)) {
 for (let i = 0; i < NUM_POINTS; i++) {
@@ -383,7 +443,7 @@ else if (sushiScene.active) updateSushiScene();
 else if (sushiGame.active) updateSushiGame();
 else updateSlidingAI();
 updateLiquidPhysics();
-if (!isAnySceneActive() && !isDragging && !isBored && now > nextEmotionTime) {
+if (!isAnySceneActive() && !isDragging && !isBored && !showPlayMenu && now > nextEmotionTime) {
 nextEmotion(1);
 }
 ctx.fillStyle = '#232529';
@@ -494,6 +554,7 @@ ctx.beginPath(); ctx.ellipse(fx, fy + 26 * s, 7 * s, 9 * s, 0, 0, Math.PI * 2); 
 }
 }
 drawBoredIndicator(fx, fy, s, frame);
+drawPlayWithMeMenu(fx, fy, s, frame);
 drawBlocks();
 drawBulbAndSocket();
 drawFightScene();
@@ -501,7 +562,7 @@ drawDrinkScene(fx, fy, s);
 drawSushiScene(fx, fy, s);
 drawSushiGame();
 updateAndDrawVapor();
-  frame++;
+frame++;
 requestAnimationFrame(drawCharacter);
 }
 drawCharacter();
