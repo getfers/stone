@@ -117,7 +117,6 @@ function startSlideScene() {
   currentEmotion = 0;
 }
 
-// --- ОТРИСОВКА ОДНОГО РОЛЛА «ФИЛАДЕЛЬФИЯ» ---
 function drawRollIcon(x, y, s, angle) {
   ctx.save();
   ctx.translate(x, y);
@@ -150,7 +149,6 @@ function drawRollIcon(x, y, s, angle) {
   ctx.restore();
 }
 
-// --- 1. СЦЕНКА ПОЕДАНИЯ РОЛЛОВ ПАЛОЧКАМИ ---
 function startSushiScene() {
   if (isAnySceneActive()) return;
   walker.isWalking = false;
@@ -224,11 +222,10 @@ function drawSushiScene(fx, fy, s) {
   ctx.restore();
 }
 
-// --- 2. МИНИ-ИГРА С ГИРОСКОПОМ: ПОЙМАЙ 5 ЛЕТАЮЩИХ РОЛЛОВ ---
 function startSushiGame() {
   if (isAnySceneActive()) return;
   if (!tiltEnabled) {
-    alert('Сначала нажмите кнопку «Гироскоп: ВЫКЛ», чтобы включить управление наклоном телефона!');
+    alert('Сначала включите гироскоп кнопкой выше!');
     return;
   }
 
@@ -320,7 +317,6 @@ function drawSushiGame() {
   ctx.restore();
 }
 
-// --- БОЙ В СТИЛЕ SHADOW FIGHT (СЛУЧАЙНЫЙ ИСХОД 50/50) ---
 function startFightScene() {
   if (isAnySceneActive()) return;
   walker.isWalking = false;
@@ -364,18 +360,19 @@ function addSlashTrail(x, y, radius, startAng, endAng, color) {
 }
 
 function updateFightScene() {
-fightScene.timer++;
-const t = fightScene.timer;
-const e = fightScene.enemy;
-const floorY = canvas.height - MARGIN - 54 * life.scale;
-e.vy += 0.42;
-e.x += e.vx;
-e.y += e.vy;
-e.vx *= 0.88;
-if (e.y > floorY) {
-e.y = floorY;
-e.vy = 0;
-}
+  fightScene.timer++;
+  const t = fightScene.timer;
+  const e = fightScene.enemy;
+  const floorY = canvas.height - MARGIN - 54 * life.scale;
+
+  e.vy += 0.42;
+  e.x += e.vx;
+  e.y += e.vy;
+  e.vx *= 0.88;
+  if (e.y > floorY) {
+    e.y = floorY;
+    e.vy = 0;
+  }
 if (fightScene.phase !== 'outro' || !fightScene.playerWins) {
 e.x = Math.max(60, Math.min(canvas.width - 60, e.x));
 }
@@ -663,7 +660,6 @@ ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 ctx.restore();
 }
-// --- ЛОГИКА И ОТРИСОВКА ГОРКИ ---
 function updateSlideScene() {
 slideScene.timer++;
 const s = life.scale;
@@ -748,7 +744,6 @@ ctx.quadraticCurveTo(235, 223, 385, 252);
 ctx.stroke();
 ctx.restore();
 }
-// --- ЛОГИКА И ОТРИСОВКА КУБИКОВ ---
 function updateBlocksScene() {
 blocksScene.timer++;
 const floorY = canvas.height - MARGIN - 12;
@@ -819,7 +814,6 @@ ctx.fillRect(b.x - hs + 4, b.y - hs + 4, b.size - 8, 5);
 }
 ctx.restore();
 }
-// --- ЛОГИКА И ОТРИСОВКА ЛАМПОЧКИ ---
 function updateBulbScene() {
 bulbScene.timer++;
 const t = bulbScene.timer;
@@ -928,7 +922,6 @@ ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 ctx.restore();
 }
-// --- ПАР И СМЕРТЬ ОТ ПЕРЕКУРА ---
 function spawnVapor(mouthX, mouthY) {
 for (let k = 0; k < 2; k++) {
 vaporParticles.push({
@@ -1009,7 +1002,6 @@ ctx.restore();
 }
 if (life.timer >= 165) triggerRebirth();
 }
-// --- СЦЕНКА С БУТЫЛКОЙ ВИСКИ ---
 function startDrinkScene() {
 if (isAnySceneActive()) return;
 walker.isWalking = false;
@@ -1080,28 +1072,24 @@ ctx.fillText('7', 0, 7);
 ctx.restore();
 }
 function drawDrinkScene(fx, fy, s) {
-  if (!drinkScene.active) return;
-  const t = drinkScene.timer;
-
-  let slideOffset = 0;
-  if (t < 20) slideOffset = (20 - t) * 4;
-  if (t > 165) slideOffset = (t - 165) * 4;
-
-  let tiltAngle = 0.25;
-  let drinkLiftY = 36;
-  if (t >= 20 && t <= 155) {
-    tiltAngle = 0.72 + Math.sin(t * 0.25) * 0.08;
-    drinkLiftY = 44;
-  }
-
-  const progress = Math.max(0, Math.min(1, (t - 25) / 130));
-  const liquidLevel = 0.85 - progress * 0.55;
-
-  drawWhiskeyBottle(
-    fx - (34 + slideOffset) * s,
-    fy + (drinkLiftY + slideOffset * 0.5) * s,
-    tiltAngle,
-    s,
-    liquidLevel
-  );
+if (!drinkScene.active) return;
+const t = drinkScene.timer;
+let slideOffset = 0;
+if (t < 20) slideOffset = (20 - t) * 4;
+if (t > 165) slideOffset = (t - 165) * 4;
+let tiltAngle = 0.25;
+let drinkLiftY = 36;
+if (t >= 20 && t <= 155) {
+tiltAngle = 0.72 + Math.sin(t * 0.25) * 0.08;
+drinkLiftY = 44;
+}
+const progress = Math.max(0, Math.min(1, (t - 25) / 130));
+const liquidLevel = 0.85 - progress * 0.55;
+drawWhiskeyBottle(
+fx - (34 + slideOffset) * s,
+fy + (drinkLiftY + slideOffset * 0.5) * s,
+tiltAngle,
+s,
+liquidLevel
+);
 }
