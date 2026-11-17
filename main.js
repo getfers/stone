@@ -157,13 +157,13 @@ function getPos(e) {
 canvas.addEventListener('pointerdown', (e) => {
   const pos = getPos(e);
 
-  // 1. Если открыта кнопка «▶ Поиграй со мной!»
+  // 1. Если горит табличка «▶ Поиграй со мной!» — нажатие на неё ИЛИ на самого камушка открывает список действий
   if (playMenuState === 'prompt') {
-    const inMenuX = pos.x >= playMenuBounds.x - 10 && pos.x <= playMenuBounds.x + playMenuBounds.w + 10;
-    const inMenuY = pos.y >= playMenuBounds.y - 10 && pos.y <= playMenuBounds.y + playMenuBounds.h + 10;
+    const inMenuX = pos.x >= playMenuBounds.x - 25 && pos.x <= playMenuBounds.x + playMenuBounds.w + 25;
+    const inMenuY = pos.y >= playMenuBounds.y - 25 && pos.y <= playMenuBounds.y + playMenuBounds.h + 35;
+    const onRock = Math.hypot(pos.x - center.x, pos.y - center.y) <= 105 * life.scale;
 
-    if (inMenuX && inMenuY) {
-      // Раскрываем список действий над головой
+    if ((inMenuX && inMenuY) || onRock) {
       playMenuState = 'list';
       lastActivityTime = Date.now();
       currentEmotion = 1;
@@ -173,18 +173,19 @@ canvas.addEventListener('pointerdown', (e) => {
       return;
     } else {
       resetIdleTimer();
+      return;
     }
-  } 
-  // 2. Если раскрыто мини-меню со списком действий
-  else if (playMenuState === 'list') {
+  }
+
+  // 2. Если уже раскрыта панель с 6 кнопками действий
+  if (playMenuState === 'list') {
     for (let item of actionButtonsBounds) {
-      if (pos.x >= item.x && pos.x <= item.x + item.w && pos.y >= item.y && pos.y <= item.y + item.h) {
+      if (pos.x >= item.x - 4 && pos.x <= item.x + item.w + 4 && pos.y >= item.y - 4 && pos.y <= item.y + item.h + 4) {
         resetIdleTimer();
         item.action();
         return;
       }
     }
-    // Если нажали мимо кнопок — закрываем меню
     resetIdleTimer();
     return;
   }
