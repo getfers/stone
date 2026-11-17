@@ -88,226 +88,204 @@ function pokeJelly(step) {
 function handleOrientation(e) {
   if (!tiltEnabled || e.gamma === null || e.beta === null) return;
   gravity.x = Math.max(-0.7, Math.min(0.7, e.gamma * 0.018));
-  gravity.y = Math.max(-0.7, Math.min(0.7, (e.beta - 35) * 0.018));
+  gravity.y = Math.max(-0.7, Math.min(0.7, (e.beta - 35) * 0.
+018));
 }
-
 function handleMotion(e) {
-  if (!tiltEnabled) return;
-  const pureAcc = e.acceleration;
-  if (pureAcc && (Math.abs(pureAcc.x) > 13 || Math.abs(pureAcc.y) > 13)) pokeJelly(1);
+if (!tiltEnabled) return;
+const pureAcc = e.acceleration;
+if (pureAcc && (Math.abs(pureAcc.x) > 13 || Math.abs(pureAcc.y) > 13)) pokeJelly(1);
 }
-
 tiltBtn.addEventListener('click', async () => {
-  resetIdleTimer();
-  if (!tiltEnabled) {
-    try {
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        const permission = await DeviceOrientationEvent.requestPermission();
-        if (permission !== 'granted') {
-          alert('Доступ к гироскопу отклонен. Перезагрузите страницу и нажмите «Разрешить».');
-          return;
-        }
-      }
-      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-        await DeviceMotionEvent.requestPermission();
-      }
-    } catch (err) {
-      alert('Ошибка доступа к датчикам: ' + err.message);
-      return;
-    }
-
-    window.addEventListener('deviceorientation', handleOrientation);
-    window.addEventListener('devicemotion', handleMotion);
-    tiltEnabled = true;
-    walker.isWalking = false;
-    tiltBtn.textContent = 'Гироскоп: ВКЛ';
-    tiltBtn.classList.add('active');
-  } else {
-    tiltEnabled = false;
-    window.removeEventListener('deviceorientation', handleOrientation);
-    window.removeEventListener('devicemotion', handleMotion);
-    gravity = { x: 0, y: 0.42 };
-    tiltBtn.textContent = 'Гироскоп: ВЫКЛ';
-    tiltBtn.classList.remove('active');
-    walker.nextWalkTime = Date.now() + 1500;
-  }
+resetIdleTimer();
+if (!tiltEnabled) {
+try {
+if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+const permission = await DeviceOrientationEvent.requestPermission();
+if (permission !== 'granted') {
+alert('Доступ к гироскопу отклонен. Перезагрузите страницу и нажмите «Разрешить».');
+return;
+}
+}
+if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+await DeviceMotionEvent.requestPermission();
+}
+} catch (err) {
+alert('Ошибка доступа к датчикам: ' + err.message);
+return;
+}
+window.addEventListener('deviceorientation', handleOrientation);
+window.addEventListener('devicemotion', handleMotion);
+tiltEnabled = true;
+walker.isWalking = false;
+tiltBtn.textContent = 'Гироскоп: ВКЛ';
+tiltBtn.classList.add('active');
+} else {
+tiltEnabled = false;
+sushiGame.active = false;
+window.removeEventListener('deviceorientation', handleOrientation);
+window.removeEventListener('devicemotion', handleMotion);
+gravity = { x: 0, y: 0.42 };
+tiltBtn.textContent = 'Гироскоп: ВЫКЛ';
+tiltBtn.classList.remove('active');
+walker.nextWalkTime = Date.now() + 1500;
+}
 });
-
 document.querySelectorAll('button').forEach(b => {
-  b.addEventListener('click', resetIdleTimer);
+b.addEventListener('click', resetIdleTimer);
 });
-
 function getPos(e) {
-  const rect = canvas.getBoundingClientRect();
-  const clientX = (e.touches && e.touches.length > 0) ? e.touches.clientX : e.clientX;
-  const clientY = (e.touches && e.touches.length > 0) ? e.touches.clientY : e.clientY;
-  return {
-    x: (clientX - rect.left) * (canvas.width / rect.width),
-    y: (clientY - rect.top) * (canvas.height / rect.height)
-  };
+const rect = canvas.getBoundingClientRect();
+const clientX = (e.touches && e.touches.length > 0) ? e.touches.clientX : e.clientX;
+const clientY = (e.touches && e.touches.length > 0) ? e.touches.clientY : e.clientY;
+return {
+x: (clientX - rect.left) * (canvas.width / rect.width),
+y: (clientY - rect.top) * (canvas.height / rect.height)
+};
 }
-
 canvas.addEventListener('pointerdown', (e) => {
-  resetIdleTimer();
-  if (bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || drinkScene.active || life.state === 'dying') return;
-  const pos = getPos(e);
-  if (Math.hypot(pos.x - center.x, pos.y - center.y) <= 95 * life.scale + 15) {
-    isDragging = true;
-    walker.isWalking = false;
-    dragMoved = false;
-    lastPointer = { x: pos.x, y: pos.y };
-    for (let n of nodes) {
-      n.vx += (n.x - pos.x) * 0.08;
-      n.vy += (n.y - pos.y) * 0.08;
-    }
-  }
+resetIdleTimer();
+if (bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || drinkScene.active || sushiScene.active || life.state === 'dying') return;
+const pos = getPos(e);
+if (Math.hypot(pos.x - center.x, pos.y - center.y) <= 95 * life.scale + 15) {
+isDragging = true;
+walker.isWalking = false;
+dragMoved = false;
+lastPointer = { x: pos.x, y: pos.y };
+for (let n of nodes) {
+n.vx += (n.x - pos.x) * 0.08;
+n.vy += (n.y - pos.y) * 0.08;
+}
+}
 });
-
 canvas.addEventListener('pointermove', (e) => {
-  if (!isDragging || bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || drinkScene.active || life.state === 'dying') return;
-  resetIdleTimer();
-  const pos = getPos(e);
-  const dx = pos.x - lastPointer.x;
-  const dy = pos.y - lastPointer.y;
-  if (Math.hypot(dx, dy) > 3) dragMoved = true;
-
-  for (let n of nodes) {
-    const dist = Math.hypot(n.x - pos.x, n.y - pos.y);
-    const weight = Math.max(0.25, 1 - dist / 165);
-    n.x += dx * weight;
-    n.y += dy * weight;
-    n.vx = dx * 0.75;
-    n.vy = dy * 0.75;
-  }
-  lastPointer = { x: pos.x, y: pos.y };
+if (!isDragging || bulbScene.active || blocksScene.active || slideScene.active || fightScene.active || drinkScene.active || sushiScene.active || life.state === 'dying') return;
+resetIdleTimer();
+const pos = getPos(e);
+const dx = pos.x - lastPointer.x;
+const dy = pos.y - lastPointer.y;
+if (Math.hypot(dx, dy) > 3) dragMoved = true;
+for (let n of nodes) {
+const dist = Math.hypot(n.x - pos.x, n.y - pos.y);
+const weight = Math.max(0.25, 1 - dist / 165);
+n.x += dx * weight;
+n.y += dy * weight;
+n.vx = dx * 0.75;
+n.vy = dy * 0.75;
+}
+lastPointer = { x: pos.x, y: pos.y };
 });
-
 canvas.addEventListener('pointerup', () => {
-  if (isDragging) {
-    if (!dragMoved) pokeJelly(1);
-    isDragging = false;
-    walker.nextWalkTime = Date.now() + 2500;
-  }
+if (isDragging) {
+if (!dragMoved) pokeJelly(1);
+isDragging = false;
+walker.nextWalkTime = Date.now() + 2500;
+}
 });
-
 function moveCharacterTo(tx, ty, speed) {
-  const dx = tx - center.x;
-  const dy = ty - center.y;
-  for (let n of nodes) {
-    n.x += dx * speed;
-    n.y += dy * speed;
-    n.vx = dx * speed * 0.5;
-    n.vy = dy * speed * 0.5;
-  }
+const dx = tx - center.x;
+const dy = ty - center.y;
+for (let n of nodes) {
+n.x += dx * speed;
+n.y += dy * speed;
+n.vx = dx * speed * 0.5;
+n.vy = dy * speed * 0.5;
 }
-
+}
 function glideCharacterX(tx) {
-  const distX = tx - center.x;
-  if (Math.abs(distX) > 4) {
-    const dir = Math.sign(distX);
-    const speed = Math.min(0.95, Math.abs(distX) * 0.035);
-    for (let i = 0; i < NUM_POINTS; i++) {
-      const lean = nodes[i].oy < 0 ? 1.15 : 0.9;
-      nodes[i].vx += dir * speed * lean;
-    }
-  }
+const distX = tx - center.x;
+if (Math.abs(distX) > 4) {
+const dir = Math.sign(distX);
+const speed = Math.min(0.95, Math.abs(distX) * 0.035);
+for (let i = 0; i < NUM_POINTS; i++) {
+const lean = nodes[i].oy < 0 ? 1.15 : 0.9;
+nodes[i].vx += dir * speed * lean;
 }
-
+}
+}
 function updateSlidingAI() {
-  if (isDragging || isAnySceneActive() || tiltEnabled) return;
-
-  const now = Date.now();
-  if (!walker.isWalking && now > walker.nextWalkTime) {
-    const mid = canvas.width / 2;
-    walker.targetX = center.x < mid ? (mid + 20 + Math.random() * (mid - 105)) : (85 + Math.random() * (mid - 105));
-    walker.isWalking = true;
-  }
-
-  if (walker.isWalking) {
-    const distX = walker.targetX - center.x;
-    if (Math.abs(distX) < 12) {
-      walker.isWalking = false;
-      walker.nextWalkTime = now + (isBored ? 4500 : 2000) + Math.random() * 3000;
-      if (!isBored && Math.random() < 0.45) nextEmotion(1);
-    } else if (center.y > canvas.height - 95) {
-      const dir = Math.sign(distX);
-      const speedMult = isBored ? 0.55 : 1.0;
-      const glideSpeed = (dir > 0 ? 0.42 : 0.36) * speedMult;
-      for (let i = 0; i < NUM_POINTS; i++) {
-        const lean = nodes[i].oy < 0 ? 1.15 : 0.9;
-        nodes[i].vx += dir * glideSpeed * lean;
-      }
-    }
-  }
+if (isDragging || isAnySceneActive() || tiltEnabled) return;
+const now = Date.now();
+if (!walker.isWalking && now > walker.nextWalkTime) {
+const mid = canvas.width / 2;
+walker.targetX = center.x < mid ? (mid + 20 + Math.random() * (mid - 105)) : (85 + Math.random() * (mid - 105));
+walker.isWalking = true;
 }
-
+if (walker.isWalking) {
+const distX = walker.targetX - center.x;
+if (Math.abs(distX) < 12) {
+walker.isWalking = false;
+walker.nextWalkTime = now + (isBored ? 4500 : 2000) + Math.random() * 3000;
+if (!isBored && Math.random() < 0.45) nextEmotion(1);
+} else if (center.y > canvas.height - 95) {
+const dir = Math.sign(distX);
+const speedMult = isBored ? 0.55 : 1.0;
+const glideSpeed = (dir > 0 ? 0.42 : 0.36) * speedMult;
+for (let i = 0; i < NUM_POINTS; i++) {
+const lean = nodes[i].oy < 0 ? 1.15 : 0.9;
+nodes[i].vx += dir * glideSpeed * lean;
+}
+}
+}
+}
 function updateLiquidPhysics() {
-  let sumX = 0, sumY = 0, sumVx = 0, sumVy = 0;
-  for (let i = 0; i < NUM_POINTS; i++) {
-    sumX += nodes[i].x; sumY += nodes[i].y;
-    sumVx += nodes[i].vx; sumVy += nodes[i].vy;
-  }
-  center.x = sumX / NUM_POINTS; center.y = sumY / NUM_POINTS;
-  center.vx = sumVx / NUM_POINTS; center.vy = sumVy / NUM_POINTS;
-
-  if (isNaN(center.x) || isNaN(center.y)) {
-    center.x = 240; center.y = 155;
-    initNodes(life.scale);
-    return;
-  }
-
-  const disableGravity = isDragging || (bulbScene.active && bulbScene.timer <= 225) || (slideScene.active && slideScene.phase !== 'landed');
-
-  for (let i = 0; i < NUM_POINTS; i++) {
-    let n = nodes[i];
-    let prev = nodes[(i - 1 + NUM_POINTS) % NUM_POINTS];
-    let next = nodes[(i + 1) % NUM_POINTS];
-
-    if (!disableGravity) {
-      n.vx += gravity.x;
-      n.vy += gravity.y;
-    }
-
-    n.vx += (center.x + n.ox - n.x) * STIFFNESS;
-    n.vy += (center.y + n.oy - n.y) * STIFFNESS;
-
-    n.vx += ((prev.x + next.x) * 0.5 - n.x) * NEIGHBOR_PULL;
-    n.vy += ((prev.y + next.y) * 0.5 - n.y) * NEIGHBOR_PULL;
-
-    n.vx *= DAMPING;
-    n.vy *= DAMPING;
-    n.x += n.vx;
-    n.y += n.vy;
-
-    if (n.y > canvas.height - MARGIN) {
-      if (n.vy > 11 && !isAnySceneActive() && !isBored) nextEmotion(1);
-      n.y = canvas.height - MARGIN;
-      n.vy = -n.vy * 0.25;
-      n.vx *= (walker.isWalking || tiltEnabled || blocksScene.active || slideScene.active || fightScene.active) ? 0.94 : 0.82;
-    }
-    if (n.y < MARGIN) { n.y = MARGIN; n.vy = -n.vy * 0.45; }
-    if (n.x > canvas.width - MARGIN) { n.x = canvas.width - MARGIN; n.vx = -n.vx * 0.45; n.vy *= 0.85; }
-    if (n.x < MARGIN) { n.x = MARGIN; n.vx = -n.vx * 0.45; n.vy *= 0.85; }
-  }
+let sumX = 0, sumY = 0, sumVx = 0, sumVy = 0;
+for (let i = 0; i < NUM_POINTS; i++) {
+sumX += nodes[i].x; sumY += nodes[i].y;
+sumVx += nodes[i].vx; sumVy += nodes[i].vy;
 }
-
+center.x = sumX / NUM_POINTS; center.y = sumY / NUM_POINTS;
+center.vx = sumVx / NUM_POINTS; center.vy = sumVy / NUM_POINTS;
+if (isNaN(center.x) || isNaN(center.y)) {
+center.x = 240; center.y = 155;
+initNodes(life.scale);
+return;
+}
+const disableGravity = isDragging || (bulbScene.active && bulbScene.timer <= 225) || (slideScene.active && slideScene.phase !== 'landed');
+for (let i = 0; i < NUM_POINTS; i++) {
+let n = nodes[i];
+let prev = nodes[(i - 1 + NUM_POINTS) % NUM_POINTS];
+let next = nodes[(i + 1) % NUM_POINTS];
+if (!disableGravity) {
+n.vx += gravity.x;
+n.vy += gravity.y;
+}
+n.vx += (center.x + n.ox - n.x) * STIFFNESS;
+n.vy += (center.y + n.oy - n.y) * STIFFNESS;
+n.vx += ((prev.x + next.x) * 0.5 - n.x) * NEIGHBOR_PULL;
+n.vy += ((prev.y + next.y) * 0.5 - n.y) * NEIGHBOR_PULL;
+n.vx *= DAMPING;
+n.vy *= DAMPING;
+n.x += n.vx;
+n.y += n.vy;
+if (n.y > canvas.height - MARGIN) {
+if (n.vy > 11 && !isAnySceneActive() && !isBored) nextEmotion(1);
+n.y = canvas.height - MARGIN;
+n.vy = -n.vy * 0.25;
+n.vx *= (walker.isWalking || tiltEnabled || blocksScene.active || slideScene.active || fightScene.active) ? 0.94 : 0.82;
+}
+if (n.y < MARGIN) { n.y = MARGIN; n.vy = -n.vy * 0.45; }
+if (n.x > canvas.width - MARGIN) { n.x = canvas.width - MARGIN; n.vx = -n.vx * 0.45; n.vy *= 0.85; }
+if (n.x < MARGIN) { n.x = MARGIN; n.vx = -n.vx * 0.45; n.vy *= 0.85; }
+}
+}
 function drawLiquidBody() {
-  ctx.beginPath();
-  for (let i = 0; i < NUM_POINTS; i++) {
-    let curr = nodes[i];
-    let next = nodes[(i + 1) % NUM_POINTS];
-    let midX = (curr.x + next.x) * 0.5;
-    let midY = (curr.y + next.y) * 0.5;
-    if (i === 0) {
-      let prev = nodes[NUM_POINTS - 1];
-      ctx.moveTo((prev.x + curr.x) * 0.5, (prev.y + curr.y) * 0.5);
-    }
-    ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
-  }
-  ctx.closePath();
+ctx.beginPath();
+for (let i = 0; i < NUM_POINTS; i++) {
+let curr = nodes[i];
+let next = nodes[(i + 1) % NUM_POINTS];
+let midX = (curr.x + next.x) * 0.5;
+let midY = (curr.y + next.y) * 0.5;
+if (i === 0) {
+let prev = nodes[NUM_POINTS - 1];
+ctx.moveTo((prev.x + curr.x) * 0.5, (prev.y + curr.y) * 0.5);
 }
-
-function drawBoredIndicator(fx, fy, s, frame) {if (!isBored || isAnySceneActive()) return;
+ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
+}
+ctx.closePath();
+}
+function drawBoredIndicator(fx, fy, s, frame) {
+if (!isBored || isAnySceneActive()) return;
 ctx.save();
 const floatY = Math.sin(frame * 0.06) * 5;
 const bx = fx + 46 * s;
@@ -332,7 +310,7 @@ ctx.fill();
 ctx.restore();
 }
 function triggerRandomIdleActivity() {
-const activities = [startVape, startDrinkScene, startBlocksScene, startSlideScene];
+const activities = [startVape, startDrinkScene, startSushiScene, startBlocksScene, startSlideScene];
 const randomAction = activities[Math.floor(Math.random() * activities.length)];
 randomAction();
 }
@@ -376,6 +354,8 @@ else if (blocksScene.active) updateBlocksScene();
 else if (slideScene.active) updateSlideScene();
 else if (fightScene.active) updateFightScene();
 else if (drinkScene.active) updateDrinkScene();
+else if (sushiScene.active) updateSushiScene();
+else if (sushiGame.active) updateSushiGame();
 else updateSlidingAI();
 updateLiquidPhysics();
 if (!isAnySceneActive() && !isDragging && !isBored && now > nextEmotionTime) {
@@ -461,6 +441,19 @@ ctx.fillStyle = '#18181b';
 ctx.beginPath();
 ctx.arc(fx - 10 * s, fy + 25 * s, (isDrinking ? 6.5 : 4.5) * s, 0, Math.PI * 2);
 ctx.fill();
+} else if (sushiScene.active) {
+const isEating = sushiScene.timer >= 70 && sushiScene.timer <= 135;
+drawGlossyEyes(ctx, fx, fy, s, lookX, isEating ? -2 : 1, isEating, isEating);
+if (isEating) {
+ctx.beginPath();
+ctx.arc(fx, fy + 23 * s, 12 * s, 0.15 * Math.PI, 0.85 * Math.PI);
+ctx.stroke();
+} else {
+ctx.fillStyle = '#18181b';
+ctx.beginPath();
+ctx.arc(fx - 8 * s, fy + 25 * s, 6.5 * s, 0, Math.PI * 2);
+ctx.fill();
+}
 } else if (emo === 'classic') {
 drawGlossyEyes(ctx, fx, fy, s, lookX, bulbLookOffset, isBlinking, isBlinking);
 } else if (emo === 'happy') {
@@ -480,6 +473,8 @@ drawBlocks();
 drawBulbAndSocket();
 drawFightScene();
 drawDrinkScene(fx, fy, s);
+drawSushiScene(fx, fy, s);
+drawSushiGame();
 updateAndDrawVapor();
 frame++;
 requestAnimationFrame(drawCharacter);
