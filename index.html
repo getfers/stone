@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'">
   <title>Камешек</title>
   <link rel="stylesheet" href="style.css">
   <script type="module" src="renderer/interface.mjs"></script>
@@ -11,7 +11,8 @@
 <body>
   <header class="app-header" data-view="welcome full widget" hidden>
     <div class="brand"><img src="assets/stone.png" alt="" width="32" height="32"> Камешек</div>
-    <button class="text-button" id="mode-menu" type="button" data-view="full widget" hidden>Режимы <span aria-hidden="true">⌄</span></button>
+    <div class="header-actions"><button class="text-button" id="open-panel" type="button" data-view="widget" aria-controls="pet-panel" aria-expanded="false" hidden>Уход</button>
+    <button class="text-button" id="mode-menu" type="button" data-view="full widget" hidden>Режимы <span aria-hidden="true">⌄</span></button></div>
   </header>
 
   <main class="workspace">
@@ -37,32 +38,75 @@
       </div>
     </section>
 
-    <section class="stage" id="stage" aria-label="Площадка камешка">
+    <section class="stage" id="stage" aria-label="Площадка камешка" data-phase="day" data-room="meadow">
       <div class="scenery" aria-hidden="true">
-        <i class="orbit"></i><i class="moon"></i><i class="hill hill-back"></i><i class="hill hill-front"></i>
+        <i class="orbit"></i><i class="sun"></i><i class="moon"></i>
         <i class="star star-one"></i><i class="star star-two"></i><i class="star star-three"></i>
+        <canvas id="landscape" width="440" height="240"></canvas>
+        <i class="nightfall"></i>
+      </div>
+      <div class="stage-heading" data-view="full widget" hidden>
+        <strong id="place-name"></strong><span id="time-name"></span>
       </div>
       <button id="pet" class="pet" type="button" aria-label="Погладить камешек">
         <canvas id="sprite" aria-hidden="true"></canvas>
       </button>
-      <canvas id="activity-scene" class="activity-scene" width="480" height="270" aria-label="Площадка занятия" tabindex="0" hidden></canvas>
+      <p id="stage-status" class="stage-status" role="status" data-view="full widget" hidden></p>
     </section>
 
-    <section class="activities" data-view="full" aria-labelledby="activity-title" hidden>
-      <div class="activity-heading">
-        <h1 id="activity-title">Занятия</h1>
-        <span id="activity-status" role="status"></span>
-        <button id="stop-activity" class="text-button" type="button" hidden>Закончить</button>
+    <aside class="pet-panel" id="pet-panel" aria-labelledby="panel-title" hidden>
+      <div class="panel-heading">
+        <h1 id="panel-title">Камешек</h1>
+        <div class="header-actions">
+          <button class="text-button panel-modes" type="button" id="panel-modes">Режимы</button>
+          <button class="text-button panel-close" type="button" id="close-panel" aria-label="Закрыть уход">×</button>
+        </div>
       </div>
-      <div id="activity-buttons" class="activity-buttons"></div>
-    </section>
+      <nav class="panel-nav" aria-label="Занятия и уход">
+        <button type="button" data-tab="care" aria-pressed="true">Уход</button>
+        <button type="button" data-tab="closet" aria-pressed="false">Гардероб</button>
+        <button type="button" data-tab="walk" aria-pressed="false">Прогулки</button>
+        <button type="button" data-tab="play" aria-pressed="false">Игры</button>
+      </nav>
+      <div class="panel-content">
+        <section data-panel="care" aria-label="Потребности">
+          <div class="meters" id="needs"></div>
+          <div class="care-buttons" id="care-buttons"></div>
+          <button class="text-button" id="sleep" type="button">Уложить спать</button>
+        </section>
+        <section data-panel="closet" aria-label="Гардероб и окружение" hidden>
+          <div class="wardrobe" id="wardrobe"></div>
+          <div class="preferences">
+            <label id="room-field">Комната<select id="room"></select></label>
+            <label>Время суток<select id="clock"></select></label>
+          </div>
+        </section>
+        <section data-panel="walk" aria-label="Прогулки" hidden>
+          <div id="trip-options" class="trip-options"></div>
+          <button class="text-button" id="return-home" type="button" hidden>Вернуться домой</button>
+          <p id="trip-status" role="status" class="panel-status"></p>
+        </section>
+        <section data-panel="play" aria-label="Игры" hidden>
+          <div id="game-options" class="game-options"></div>
+          <div id="game-player" hidden>
+            <div class="activity-heading">
+              <span id="activity-status" role="status"></span>
+              <button id="stop-activity" class="text-button" type="button">Закончить</button>
+            </div>
+            <canvas id="activity-scene" class="activity-scene" width="480" height="270" aria-label="Площадка занятия" tabindex="0" hidden></canvas>
+            <div id="game-board"></div>
+          </div>
+        </section>
+        <p id="device-status" class="panel-status" role="status"></p>
+      </div>
+    </aside>
   </main>
 
   <footer class="app-footer" data-view="welcome full" hidden>
     <label><input type="checkbox" id="roaming"> Самостоятельное движение</label>
     <span id="settings-error" role="status"></span>
     <span data-view="welcome" hidden>Режим можно сменить через значок в трее</span>
-    <span data-view="full" hidden>Нажмите на камешек или перетащите его</span>
+    <span data-view="full" hidden>Погладьте камешек или переместите его мышью</span>
   </footer>
 </body>
 </html>

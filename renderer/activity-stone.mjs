@@ -1,13 +1,4 @@
-export function getBodyColor(blueRatio) {
-  // Гладкий светло-серый/белый базовый оттенок 3D-шара
-  const baseR = 222,
-    baseG = 195,
-    baseB = 230;
-  const r = Math.round(baseR + (37 - baseR) * blueRatio);
-  const g = Math.round(baseG + (99 - baseG) * blueRatio);
-  const b = Math.round(baseB + (235 - baseB) * blueRatio);
-  return 'rgb(' + r + ',' + g + ',' + b + ')';
-}
+export const bodyColor = '#dec3e6';
 
 // Объемная 3D-светотень и глубокие глазницы внутри тела
 export function drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody) {
@@ -24,11 +15,22 @@ export function drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody) {
     center.y,
     78 * s,
   );
-  grad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+  grad.addColorStop(0, '#fff4e9dc');
   grad.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
-  grad.addColorStop(1, 'rgba(20, 22, 28, 0.38)');
+  grad.addColorStop(1, '#49325783');
   ctx.fillStyle = grad;
   ctx.fillRect(center.x - 100 * s, center.y - 100 * s, 200 * s, 200 * s);
+
+  ctx.strokeStyle = '#fde6f282';
+  ctx.lineWidth = 1.6 * s;
+  ctx.beginPath();
+  ctx.moveTo(center.x - 65 * s, center.y - 22 * s);
+  ctx.bezierCurveTo(
+    center.x - 26 * s, center.y + 4 * s,
+    center.x + 15 * s, center.y - 38 * s,
+    center.x + 67 * s, center.y - 11 * s
+  );
+  ctx.stroke();
 
   // Мягкие углубления (глазницы), как на картинке
   const leftSocket = ctx.createRadialGradient(
