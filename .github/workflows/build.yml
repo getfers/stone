@@ -48,6 +48,37 @@ jobs:
             }
             if (!$launcher.WaitForExit(5000)) { Stop-Process -Id $launcher.Id -Force }
           }
+      - name: Verify portable autostart
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $exe = (Resolve-Path 'dist/Stone-Windows-x64.exe').Path
+          $profile = Join-Path $env:RUNNER_TEMP 'stone-autostart'
+          $null = New-Item -ItemType Directory -Path $profile -Force
+          '{"roaming":true,"mode":"widget","autostart":true}' |
+            Set-Content (Join-Path $profile 'settings.json') -Encoding utf8
+          $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+          $name = 'io.github.getfers.stone'
+          $launcher = Start-Process -FilePath $exe -ArgumentList "--autostart --user-data-dir=`"$profile`"" -PassThru
+          try {
+            $deadline = (Get-Date).AddSeconds(75)
+            do {
+              $registered = Get-ItemPropertyValue -LiteralPath $runKey -Name $name -ErrorAction SilentlyContinue
+              if ($registered -or $launcher.HasExited) { break }
+              Start-Sleep -Seconds 1
+            } while ((Get-Date) -lt $deadline)
+            if (!$registered -or !$registered.Contains($exe) -or !$registered.EndsWith('--autostart')) {
+              throw "Windows autostart did not register the portable executable."
+            }
+            if (Get-Process -Name 'Камешек' -ErrorAction SilentlyContinue |
+                Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero }) {
+              throw "Autostart opened the pet window instead of starting in the tray."
+            }
+          } finally {
+            Get-Process -Name 'Камешек' -ErrorAction SilentlyContinue | Stop-Process -Force
+            if (!$launcher.WaitForExit(5000)) { Stop-Process -Id $launcher.Id -Force }
+            Remove-ItemProperty -LiteralPath $runKey -Name $name -ErrorAction SilentlyContinue
+          }
       - uses: actions/upload-artifact@v7
         with:
           name: Stone-Windows-x64

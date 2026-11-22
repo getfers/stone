@@ -1,5 +1,5 @@
 const path = require('node:path');
-const { app, ipcMain, powerMonitor, Tray } = require('electron');
+const { app, ipcMain, nativeTheme, powerMonitor, Tray } = require('electron');
 const { loadSettings } = require('./settings.cjs');
 const { createPetState } = require('./pet-state.cjs');
 const { createWindowManager } = require('./windows.cjs');
@@ -14,6 +14,7 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 function start() {
+  nativeTheme.themeSource = 'dark';
   app.setAppUserModelId('io.github.getfers.stone');
   const userData = app.getPath('userData');
   const settings = loadSettings(userData);
