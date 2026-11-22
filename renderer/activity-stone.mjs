@@ -1,9 +1,8 @@
-const costumes = ['glossy'];
-let currentCostume = 0;
-
-function getBodyColor(blueRatio) {
+export function getBodyColor(blueRatio) {
   // Гладкий светло-серый/белый базовый оттенок 3D-шара
-  const baseR = 236, baseG = 238, baseB = 242;
+  const baseR = 222,
+    baseG = 195,
+    baseB = 230;
   const r = Math.round(baseR + (37 - baseR) * blueRatio);
   const g = Math.round(baseG + (99 - baseG) * blueRatio);
   const b = Math.round(baseB + (235 - baseB) * blueRatio);
@@ -11,15 +10,19 @@ function getBodyColor(blueRatio) {
 }
 
 // Объемная 3D-светотень и глубокие глазницы внутри тела
-function drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody) {
+export function drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody) {
   ctx.save();
   drawLiquidBody();
   ctx.clip();
 
   // Объемный градиент для эффекта гладкого матового пластика/керамики
   const grad = ctx.createRadialGradient(
-    center.x - 20 * s, center.y - 28 * s, 8 * s,
-    center.x, center.y, 78 * s
+    center.x - 20 * s,
+    center.y - 28 * s,
+    8 * s,
+    center.x,
+    center.y,
+    78 * s,
   );
   grad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
   grad.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
@@ -28,7 +31,14 @@ function drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody) {
   ctx.fillRect(center.x - 100 * s, center.y - 100 * s, 200 * s, 200 * s);
 
   // Мягкие углубления (глазницы), как на картинке
-  const leftSocket = ctx.createRadialGradient(fx - 19 * s, fy - 4 * s, 8 * s, fx - 19 * s, fy - 4 * s, 25 * s);
+  const leftSocket = ctx.createRadialGradient(
+    fx - 19 * s,
+    fy - 4 * s,
+    8 * s,
+    fx - 19 * s,
+    fy - 4 * s,
+    25 * s,
+  );
   leftSocket.addColorStop(0, 'rgba(15, 17, 22, 0.35)');
   leftSocket.addColorStop(0.75, 'rgba(15, 17, 22, 0.12)');
   leftSocket.addColorStop(1, 'rgba(15, 17, 22, 0)');
@@ -37,7 +47,14 @@ function drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody) {
   ctx.arc(fx - 19 * s, fy - 4 * s, 25 * s, 0, Math.PI * 2);
   ctx.fill();
 
-  const rightSocket = ctx.createRadialGradient(fx + 19 * s, fy - 4 * s, 8 * s, fx + 19 * s, fy - 4 * s, 25 * s);
+  const rightSocket = ctx.createRadialGradient(
+    fx + 19 * s,
+    fy - 4 * s,
+    8 * s,
+    fx + 19 * s,
+    fy - 4 * s,
+    25 * s,
+  );
   rightSocket.addColorStop(0, 'rgba(15, 17, 22, 0.35)');
   rightSocket.addColorStop(0.75, 'rgba(15, 17, 22, 0.12)');
   rightSocket.addColorStop(1, 'rgba(15, 17, 22, 0)');
@@ -50,10 +67,19 @@ function drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody) {
 }
 
 // Большие глянцевые черные глаза со стеклянным бликом
-function drawGlossyEyes(ctx, fx, fy, s, lookX, pupilOffsetY, leftClosed, rightClosed) {
+export function drawGlossyEyes(
+  ctx,
+  fx,
+  fy,
+  s,
+  lookX,
+  pupilOffsetY,
+  leftClosed,
+  rightClosed,
+) {
   const eyePositions = [
     { x: fx - 19 * s, y: fy - 4 * s, closed: leftClosed },
-    { x: fx + 19 * s, y: fy - 4 * s, closed: rightClosed }
+    { x: fx + 19 * s, y: fy - 4 * s, closed: rightClosed },
   ];
 
   for (let eye of eyePositions) {
@@ -65,7 +91,15 @@ function drawGlossyEyes(ctx, fx, fy, s, lookX, pupilOffsetY, leftClosed, rightCl
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
     ctx.lineWidth = Math.max(1.5, 2.5 * s);
     ctx.beginPath();
-    ctx.ellipse(eye.x, eye.y + 1.5 * s, rx + 1.5 * s, ry + 1.5 * s, 0, 0, Math.PI * 2);
+    ctx.ellipse(
+      eye.x,
+      eye.y + 1.5 * s,
+      rx + 1.5 * s,
+      ry + 1.5 * s,
+      0,
+      0,
+      Math.PI * 2,
+    );
     ctx.stroke();
 
     // Глубокий черный глянцевый шар глаза
@@ -75,7 +109,7 @@ function drawGlossyEyes(ctx, fx, fy, s, lookX, pupilOffsetY, leftClosed, rightCl
       2 * s,
       eye.x,
       eye.y,
-      rx
+      rx,
     );
     eyeGrad.addColorStop(0, '#27272a');
     eyeGrad.addColorStop(0.5, '#09090b');
@@ -100,14 +134,20 @@ function drawGlossyEyes(ctx, fx, fy, s, lookX, pupilOffsetY, leftClosed, rightCl
         6.5 * s,
         -0.25,
         0,
-        Math.PI * 2
+        Math.PI * 2,
       );
       ctx.fill();
 
       // Яркая точечная искра блика
       ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
       ctx.beginPath();
-      ctx.arc(eye.x - 6 * s + lookX * 0.2, eye.y - 7 * s + pupilOffsetY * 0.5 * s, 2.5 * s, 0, Math.PI * 2);
+      ctx.arc(
+        eye.x - 6 * s + lookX * 0.2,
+        eye.y - 7 * s + pupilOffsetY * 0.5 * s,
+        2.5 * s,
+        0,
+        Math.PI * 2,
+      );
       ctx.fill();
     }
 

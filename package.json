@@ -1,0 +1,33 @@
+{
+  "name": "stone-desktop",
+  "version": "1.0.0",
+  "description": "Виртуальный питомец-камешек для Windows",
+  "author": "getfers",
+  "private": true,
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "io.github.getfers.stone",
+    "productName": "Камешек",
+    "files": [
+      "electron/**",
+      "renderer/**",
+      "assets/stone.png",
+      "assets/tray.png",
+      "index.html",
+      "style.css"
+    ],
+    "win": {
+      "icon": "assets/stone.ico",
+      "target": "portable",
+      "artifactName": "Stone-Windows-x64.exe"
+    }
+  }
+}
