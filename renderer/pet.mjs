@@ -5,13 +5,18 @@ export class Pet {
     this.mode = mode;
     this.roaming = roaming;
     this.time = 0;
-    this.nextWalk = 1.8;
     this.nextBlink = 3.4;
     this.happyUntil = 0;
     this.motion = 0;
     this.look = 0;
     this.tilt = 0;
     this.stride = 0;
+    this.sleepBlend = 0;
+    this.effectAt = -100;
+    this.phase = 'day';
+    this.previousPhase = 'day';
+    this.phaseBlend = 1;
+    this.equipped = {};
   }
 
   resize(width, height) {
@@ -33,7 +38,7 @@ export class Pet {
   place(x, y) {
     const { width, height } = this.bounds;
     const side = Math.min(84 * this.scale, width / 2);
-    const top = Math.min(62 * this.scale, height / 2);
+    const top = Math.min(92 * this.scale, height / 2);
     const bottom = Math.min(48 * this.scale, height / 2);
     this.x = clamp(x, side, width - side);
     this.y = clamp(y, top, height - bottom);
@@ -42,13 +47,37 @@ export class Pet {
   setRoaming(value) {
     this.roaming = value;
     this.target = null;
-    this.nextWalk = this.time + 1;
   }
 
-  pet() {
-    this.happyUntil = this.time + 1.05;
+  update(state) {
+    this.sleeping = Boolean(state.sleeping);
+    this.equipped = state.equipped;
+    if (this.phase !== state.phase) {
+      this.previousPhase = this.phase;
+      this.phase = state.phase;
+      this.phaseBlend = 0;
+    }
+    this.trip = state.trip?.id;
+    if (this.sleeping) this.target = null;
+    if (!state.effect) return;
+
+    if (state.effect === 'walk') {
+      this.walk();
+      return;
+    }
+    this.effect = state.effect;
+    this.effectAt = this.time;
     this.target = null;
-    this.nextWalk = this.time + 2.2;
+    if (state.effect === 'celebrate') this.happyUntil = this.time + 1.05;
+  }
+
+  walk() {
+    if (!this.roaming || this.held || this.sleeping || !this.bounds || this.target) return;
+    const { width, height } = this.bounds;
+    const left = this.x > width / 2;
+    const x = width * (left ? 0.14 + Math.random() * 0.26 : 0.60 + Math.random() * 0.26);
+    const y = this.mode === 'overlay' ? height * (0.14 + Math.random() * 0.7) : this.y;
+    this.target = { x, y };
   }
 
   hold() {
@@ -63,7 +92,6 @@ export class Pet {
 
   release() {
     this.held = false;
-    this.nextWalk = this.time + 2;
   }
 
   step(dt) {
@@ -72,13 +100,8 @@ export class Pet {
       this.nextBlink = this.time + 2.5 + Math.random() * 3;
     }
 
-    const { width, height } = this.bounds;
-    if (this.roaming && !this.held && !this.target && this.time >= this.nextWalk) {
-      const left = this.x > width / 2;
-      const x = width * (left ? 0.13 + Math.random() * 0.28 : 0.59 + Math.random() * 0.28);
-      const y = this.mode === 'overlay' ? height * (0.08 + Math.random() * 0.84) : this.y;
-      this.target = { x, y };
-    }
+    this.sleepBlend += (Number(Boolean(this.sleeping)) - this.sleepBlend) * Math.min(1, dt * 3);
+    this.phaseBlend = Math.min(1, this.phaseBlend + dt / 1.8);
 
     let walking = false;
     if (this.target) {
@@ -92,10 +115,7 @@ export class Pet {
       if (distance > 0) this.place(this.x + dx * step / distance, this.y + dy * step / distance);
       walking = Math.hypot(this.x - previousX, this.y - previousY) > 0 && distance > step;
       this.look += (Math.sign(dx) - this.look) * Math.min(1, dt * 5);
-      if (!walking) {
-        this.target = null;
-        this.nextWalk = this.time + 1.8 + Math.random() * 2.8;
-      }
+      if (!walking) this.target = null;
     } else {
       this.look *= Math.exp(-dt * 4);
     }

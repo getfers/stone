@@ -22,7 +22,7 @@ function positionFloatingWindow(entry, display) {
   if (entry.mode === 'widget') positionWidget(entry.window, display.workArea);
 }
 
-function createWindowManager(settings, quit, refreshMenu) {
+function createWindowManager(settings, quit, refreshMenu, petSnapshot) {
   let current;
   let pending;
 
@@ -44,9 +44,9 @@ function createWindowManager(settings, quit, refreshMenu) {
 
     const options = {
       welcome: { width: 1000, height: 672, minWidth: 720, minHeight: 530 },
-      full: { width: 970, height: 740, minWidth: 620, minHeight: 575 },
+      full: { width: 1000, height: 740, minWidth: 620, minHeight: 575 },
       widget: {
-        width: 310, height: 245, alwaysOnTop: true, resizable: false,
+        width: 354, height: 330, alwaysOnTop: true, resizable: false,
         maximizable: false, fullscreenable: false
       },
       overlay: {
@@ -67,7 +67,8 @@ function createWindowManager(settings, quit, refreshMenu) {
         preload: path.join(__dirname, 'preload.cjs'),
         contextIsolation: true,
         sandbox: true,
-        nodeIntegration: false
+        nodeIntegration: false,
+        backgroundThrottling: mode !== 'overlay'
       },
       ...options[mode]
     });
@@ -89,7 +90,7 @@ function createWindowManager(settings, quit, refreshMenu) {
       }
       if (pending === entry) pending = null;
     });
-    window.once('ready-to-show', () => {
+    function reveal() {
       if (pending !== entry) return;
       const previous = current;
       current = entry;
@@ -97,12 +98,15 @@ function createWindowManager(settings, quit, refreshMenu) {
       if (mode === 'overlay') window.showInactive();
       else window.show();
       window.webContents.send('stone:roaming-changed', settings.roaming);
+      window.webContents.send('stone:pet-state', petSnapshot());
       previous?.window.destroy();
       refreshMenu();
-    });
-    window.loadFile(path.join(root, 'index.html'), {
+    }
+    const ready = new Promise(resolve => window.once('ready-to-show', resolve));
+    const loaded = window.loadFile(path.join(root, 'index.html'), {
       query: { mode, roaming: String(settings.roaming) }
-    }).catch(error => {
+    });
+    Promise.all([ready, loaded]).then(reveal).catch(error => {
       if (window.isDestroyed()) return;
       window.destroy();
       dialog.showErrorBox('Камешек', 'Не удалось открыть окно. ' + error.message);
@@ -140,6 +144,8 @@ function createWindowManager(settings, quit, refreshMenu) {
         checked: current?.mode === mode,
         click: () => show(mode)
       })),
+      { label: 'Занятия и уход', enabled: Boolean(current && current.mode !== 'welcome'),
+        click: () => current?.window.webContents.send('stone:open-panel') },
       { type: 'separator' },
       { label: 'Самостоятельное движение', type: 'checkbox', checked: settings.roaming, click: item => {
         try {
@@ -157,9 +163,14 @@ function createWindowManager(settings, quit, refreshMenu) {
     show,
     menu,
     setRoaming,
+    get current() {
+      return current;
+    },
+    publishPet(state) {
+      current?.window.webContents.send('stone:pet-state', state);
+    },
     fromSender(sender) {
       if (current?.window.webContents === sender) return current;
-      if (pending?.window.webContents === sender) return pending;
       return undefined;
     }
   };
