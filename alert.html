@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>Камешек · Напоминание</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="renderer/alert.mjs"></script>
+</head>
+<body class="alert-view">
+  <main id="alert-card" class="alert-card" aria-labelledby="alert-title" hidden>
+    <div class="alert-pet" aria-hidden="true">
+      <i class="ring ring-left"></i><i class="ring ring-right"></i>
+      <div id="alert-sprite-box"><canvas id="alert-sprite"></canvas></div>
+    </div>
+    <div class="alert-bubble">
+      <div class="alert-heading"><h1 id="alert-title"></h1><time id="alert-time"></time></div>
+      <p id="alert-message" tabindex="0"></p>
+      <div class="alert-actions">
+        <button id="alert-snooze" class="text-button" type="button">Отложить на 5 минут</button>
+        <button id="alert-dismiss" class="primary-button" type="button"></button>
+      </div>
+      <p id="alert-error" role="status"></p>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,5 +1,5 @@
-const fs = require('node:fs');
 const path = require('node:path');
+const { readJson, writeJson } = require('./storage.cjs');
 const { needs, periods, rooms, clothes, trips, care } = require('../renderer/catalog.mjs');
 
 const clamp = value => Math.min(100, Math.max(0, value));
@@ -46,22 +46,14 @@ function restore(saved, now) {
 
 function createPetState(userData, { clock = Date.now, random = Math.random } = {}) {
   const file = path.join(userData, 'pet.json');
-  let saved;
-  try {
-    saved = JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch (error) {
-    if (error.code !== 'ENOENT') console.warn('Could not read pet:', error.message);
-  }
-  const state = restore(saved ?? {}, clock());
+  const state = restore(readJson(file), clock());
   let nextDecision = clock() + 4000;
   let saveAt = 0;
   let status = '';
 
   function save() {
     try {
-      fs.mkdirSync(userData, { recursive: true });
-      fs.writeFileSync(file + '.tmp', JSON.stringify(state) + '\n');
-      fs.renameSync(file + '.tmp', file);
+      writeJson(file, state);
       saveAt = clock();
     } catch (error) {
       console.warn('Could not save pet:', error.message);
@@ -189,7 +181,7 @@ function createPetState(userData, { clock = Date.now, random = Math.random } = {
     } else if (action === 'return' && state.trip) {
       state.trip = null;
       status = 'Камешек вернулся домой.';
-    } else if (action === 'activity') {
+    } else if (action === 'activity' || action === 'alert') {
       if (state.sleeping) effect = wake(now, true);
     } else if (action === 'game' && Number.isInteger(value) && value >= 1 && value <= 24) {
       gain({ mood: value, fun: value + 7, energy: -4 });

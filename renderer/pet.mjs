@@ -21,7 +21,7 @@ export class Pet {
 
   resize(width, height) {
     const previous = this.bounds;
-    const maxSize = { welcome: 1.68, widget: 0.95, full: 1.55, overlay: 0.93 }[this.mode];
+    const maxSize = { welcome: 1.9, widget: 0.95, full: 1.78, overlay: 0.93 }[this.mode];
     this.scale = Math.min(maxSize, width / 190, height / 132);
     this.bounds = { width, height };
 

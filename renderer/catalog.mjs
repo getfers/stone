@@ -10,7 +10,7 @@ export const needs = {
 export const periods = { morning: 'Утро', day: 'День', evening: 'Вечер', night: 'Ночь' };
 
 export const rooms = {
-  meadow: 'Лавандовые холмы',
+  meadow: 'Тихие холмы',
   studio: 'Уютная комната',
   garden: 'Тихий сад'
 };

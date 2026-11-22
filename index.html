@@ -11,18 +11,22 @@
 <body>
   <header class="app-header" data-view="welcome full widget" hidden>
     <div class="brand"><img src="assets/stone.png" alt="" width="32" height="32"> Камешек</div>
-    <div class="header-actions"><button class="text-button" id="open-panel" type="button" data-view="widget" aria-controls="pet-panel" aria-expanded="false" hidden>Уход</button>
+    <div class="header-actions">
+      <button class="text-button" type="button" data-organizer="notes">
+        <span class="notebook-icon" aria-hidden="true"></span><span>Органайзер</span>
+      </button>
+      <button class="text-button" id="open-panel" type="button" data-view="widget" aria-controls="pet-panel" aria-expanded="false" hidden>Уход</button>
     <button class="text-button" id="mode-menu" type="button" data-view="full widget" hidden>Режимы <span aria-hidden="true">⌄</span></button></div>
   </header>
 
   <main class="workspace">
     <section class="welcome" data-view="welcome" aria-labelledby="welcome-title" hidden>
-      <h1 id="welcome-title">Познакомьтесь<br>с камешком</h1>
-      <p class="intro">Выберите, где поселится ваш виртуальный питомец.</p>
+      <h1 id="welcome-title">Ваш камешек</h1>
+      <p class="intro">Выберите, где будет жить ваш питомец.</p>
       <div class="mode-list">
         <button class="mode-card" type="button" data-mode="overlay">
           <span class="mode-icon desktop-icon" aria-hidden="true"></span>
-          <span><strong>На рабочем столе</strong><small>Гуляет поверх окон</small></span>
+          <span><strong>Оверлей</strong><small>Гуляет поверх окон</small></span>
           <span class="mode-arrow" aria-hidden="true">→</span>
         </button>
         <button class="mode-card" type="button" data-mode="widget">
@@ -32,7 +36,7 @@
         </button>
         <button class="mode-card" type="button" data-mode="full">
           <span class="mode-icon window-icon" aria-hidden="true"></span>
-          <span><strong>Полное окно</strong><small>Своя площадка и занятия</small></span>
+          <span><strong>Полное окно</strong><small>Уход, гардероб и прогулки</small></span>
           <span class="mode-arrow" aria-hidden="true">→</span>
         </button>
       </div>
@@ -40,7 +44,7 @@
 
     <section class="stage" id="stage" aria-label="Площадка камешка" data-phase="day" data-room="meadow">
       <div class="scenery" aria-hidden="true">
-        <i class="orbit"></i><i class="sun"></i><i class="moon"></i>
+        <i class="sun"></i><i class="moon"></i>
         <i class="star star-one"></i><i class="star star-two"></i><i class="star star-three"></i>
         <canvas id="landscape" width="440" height="240"></canvas>
         <i class="nightfall"></i>
@@ -51,6 +55,7 @@
       <button id="pet" class="pet" type="button" aria-label="Погладить камешек">
         <canvas id="sprite" aria-hidden="true"></canvas>
       </button>
+      <p class="stage-status welcome-hint" data-view="welcome" hidden>Погладьте камешек или переместите его мышью</p>
       <p id="stage-status" class="stage-status" role="status" data-view="full widget" hidden></p>
     </section>
 

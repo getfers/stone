@@ -20,7 +20,34 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm test
       - run: npm run build
+      - name: Launch the portable executable
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $exe = (Resolve-Path 'dist/Stone-Windows-x64.exe').Path
+          $profile = Join-Path $env:RUNNER_TEMP 'stone-smoke'
+          $launcher = Start-Process -FilePath $exe -ArgumentList "--user-data-dir=`"$profile`"" -PassThru
+          $pet = $null
+          try {
+            $deadline = (Get-Date).AddSeconds(75)
+            do {
+              $pet = Get-Process -Name 'Камешек' -ErrorAction SilentlyContinue |
+                Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero -and $_.MainWindowTitle -eq 'Камешек' } |
+                Select-Object -First 1
+              if ($pet -or $launcher.HasExited) { break }
+              Start-Sleep -Seconds 1
+            } while ((Get-Date) -lt $deadline)
+            if (!$pet) { throw "The portable executable did not open the pet window." }
+          } finally {
+            if ($pet) {
+              Stop-Process -Id $pet.Id -Force
+            } else {
+              Get-Process -Name 'Камешек' -ErrorAction SilentlyContinue | Stop-Process -Force
+            }
+            if (!$launcher.WaitForExit(5000)) { Stop-Process -Id $launcher.Id -Force }
+          }
       - uses: actions/upload-artifact@v7
         with:
           name: Stone-Windows-x64

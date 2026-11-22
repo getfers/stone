@@ -70,8 +70,8 @@ export function roll(ctx, x, y, scale = 1, angle = 0) {
   ctx.rotate(angle);
   ctx.scale(scale, scale);
   ctx.lineWidth = 1.4;
-  rounded(ctx, -15, -7, 30, 18, 8, '#6e4969', '#3b284b');
-  rounded(ctx, -15, -12, 30, 17, 8, '#95627d', '#3b284b');
+  rounded(ctx, -15, -7, 30, 18, 8, '#584547', '#302a29');
+  rounded(ctx, -15, -12, 30, 17, 8, '#86614f', '#302a29');
   rounded(ctx, -12, -10, 24, 13, 6, '#fff1df');
   ellipse(ctx, 0, -3.5, 6, 3.8, '#e27e81');
   ellipse(ctx, -3, -4.5, 2.7, 2, '#6eae97');
@@ -103,23 +103,23 @@ export function garment(ctx, id, x, y, scale = 1) {
     rounded(ctx, -33, -2, 67, 12, 6, leaf ? '#829c53' : '#90cbb9', ctx.strokeStyle);
     ellipse(ctx, leaf ? 13 : -8, -29, 8, 6, leaf ? '#dfd694' : '#d8fae4');
   } else if (id === 'glasses') {
-    ctx.strokeStyle = '#584369';
+    ctx.strokeStyle = '#41464a';
     for (const left of [-40, 5]) {
-      rounded(ctx, left, -13, 35, 28, 13, '#e3b6e848', '#584369');
+      rounded(ctx, left, -13, 35, 28, 13, '#cee0db32', '#41464a');
       ctx.beginPath();
       ctx.moveTo(left + 6, -4);
       ctx.lineTo(left + 12, -8);
-      ctx.strokeStyle = '#fff2fb9e';
+      ctx.strokeStyle = '#f8f7ec9e';
       ctx.stroke();
     }
-    ctx.strokeStyle = '#584369';
+    ctx.strokeStyle = '#41464a';
     ctx.beginPath();
     ctx.moveTo(-5, -1);
     ctx.quadraticCurveTo(0, -7, 5, -1);
     ctx.stroke();
   } else if (id === 'scarf') {
-    ctx.fillStyle = '#b04f78';
-    ctx.strokeStyle = '#713d60';
+    ctx.fillStyle = '#a5504d';
+    ctx.strokeStyle = '#6b3734';
     ctx.beginPath();
     ctx.moveTo(-53, -10);
     ctx.quadraticCurveTo(-5, 12, 49, -10);
@@ -128,7 +128,7 @@ export function garment(ctx, id, x, y, scale = 1) {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    rounded(ctx, 23, 0, 14, 19, 4, '#d77995', '#713d60');
+    rounded(ctx, 23, 0, 14, 19, 4, '#cf7467', '#6b3734');
   } else if (id === 'bow') {
     ctx.strokeStyle = '#92475f';
     ctx.fillStyle = '#ef9da8';
@@ -173,7 +173,7 @@ export function ball(ctx, x, y, radius) {
   const fill = ctx.createRadialGradient(x - 4, y - 5, 2, x, y, radius);
   fill.addColorStop(0, '#fff0c2');
   fill.addColorStop(0.45, '#eeb67e');
-  fill.addColorStop(1, '#bd6983');
+  fill.addColorStop(1, '#a75e4b');
   ellipse(ctx, x, y, radius, radius, fill);
   ctx.strokeStyle = '#ffeedcaa';
   ctx.lineWidth = 1.2;
@@ -234,10 +234,10 @@ function picnicCloth(ctx, x, y, scale) {
   ctx.transform(1, 0.11, -0.7, 0.52, 0, 0);
   ctx.beginPath();
   ctx.roundRect(-57, -21, 114, 42, 6);
-  ctx.fillStyle = '#ffe4dd';
+  ctx.fillStyle = '#b7977b';
   ctx.fill();
   ctx.clip();
-  ctx.fillStyle = '#d8617799';
+  ctx.fillStyle = '#853e3499';
   for (let n = -60; n < 60; n += 16) ctx.fillRect(n, -22, 8, 44);
   for (let n = -22; n < 22; n += 16) ctx.fillRect(-58, n, 116, 8);
   ctx.restore();
@@ -245,44 +245,44 @@ function picnicCloth(ctx, x, y, scale) {
 
 export function landscape(ctx, scene) {
   if (scene === 'studio') {
-    terrain(ctx, [[200, 221, 450, 177]], '#674c65a8');
-    rounded(ctx, 293, 36, 75, 111, 33, '#e9d1d489', '#ffeff39a');
-    rounded(ctx, 302, 45, 57, 92, 25, '#6b659488');
-    ctx.fillStyle = '#f0d9ea96';
+    terrain(ctx, [[200, 221, 450, 177]], '#35332f');
+    rounded(ctx, 293, 36, 75, 111, 33, '#bcb7a74d', '#b5ae9762');
+    rounded(ctx, 302, 45, 57, 92, 25, '#202426');
+    ctx.fillStyle = '#8b8b7b72';
     ctx.fillRect(327, 46, 4, 91);
     ctx.fillRect(303, 95, 56, 4);
-    ellipse(ctx, 213, 210, 131, 32, '#d59cb475');
-    ellipse(ctx, 213, 210, 112, 25, '#dcb0bd55');
-    rounded(ctx, 52, 151, 42, 42, 8, '#c28980');
+    ellipse(ctx, 213, 210, 131, 32, '#54504876');
+    ellipse(ctx, 213, 210, 112, 25, '#79736342');
+    rounded(ctx, 52, 151, 42, 42, 8, '#695748');
     for (const [x, y, radius] of [[59, 133, 17], [79, 131, 14], [72, 116, 13]]) {
-      ellipse(ctx, x, y, radius, radius * 1.35, '#81ac94');
+      ellipse(ctx, x, y, radius, radius * 1.35, '#677263');
     }
   } else if (scene === 'beach') {
-    terrain(ctx, [[150, 106, 460, 168]], '#6eb5c3bc');
-    terrain(ctx, [[175, 203, 460, 150]], '#c6e8dd');
-    terrain(ctx, [[175, 211, 460, 160]], '#efc9a0');
+    terrain(ctx, [[150, 106, 460, 168]], '#43585b');
+    terrain(ctx, [[175, 203, 460, 150]], '#899892');
+    terrain(ctx, [[175, 211, 460, 160]], '#61594d');
     for (const [x, y] of [[56, 208], [351, 215], [373, 198]]) garment(ctx, 'shell', x, y, 0.54);
   } else {
-    terrain(ctx, [[90, 113, 226, 149], [350, 82, 460, 151]], scene === 'meadow' ? '#9373b5a0' : '#719987ad');
-    terrain(ctx, [[99, 149, 247, 175], [340, 125, 460, 183]], scene === 'meadow' ? '#70568cbf' : '#537e75c5');
-    terrain(ctx, [[189, 230, 460, 177]], scene === 'meadow' ? '#5d4b74b5' : '#637e62');
+    terrain(ctx, [[90, 113, 226, 149], [350, 82, 460, 151]], scene === 'meadow' ? '#343937' : '#3b4641');
+    terrain(ctx, [[99, 149, 247, 175], [340, 125, 460, 183]], scene === 'meadow' ? '#292e2c' : '#313c36');
+    terrain(ctx, [[189, 230, 460, 177]], scene === 'meadow' ? '#222625' : '#2d3730');
     if (scene === 'forest') {
       for (const [x, y, size] of [[28, 174, 1.2], [89, 184, 1.55], [144, 167, 0.8], [315, 154, 0.78], [363, 181, 1.42], [418, 189, 1.7]]) {
-        pine(ctx, x, y, size, x % 2 === 0 ? '#375b59' : '#4d7266');
+        pine(ctx, x, y, size, x % 2 === 0 ? '#334943' : '#425b50');
       }
     } else if (scene === 'picnic') {
       picnicCloth(ctx, 113, 194, 1.15);
       picnicCloth(ctx, 342, 215, 0.64);
     } else if (scene === 'garden') {
       for (const [x, y] of [[40, 191], [74, 205], [112, 184], [332, 172], [370, 194], [412, 184]]) {
-        rounded(ctx, x - 1, y - 4, 2, 15, 1, '#a0bf93');
-        ellipse(ctx, x, y - 7, 6, 6, '#efb5c2');
+        rounded(ctx, x - 1, y - 4, 2, 15, 1, '#647261');
+        ellipse(ctx, x, y - 7, 6, 6, '#ad8672');
         ellipse(ctx, x + 1, y - 8, 2, 2, '#ffe0ac');
       }
     } else {
       for (const [x, y] of [[32, 183], [61, 197], [117, 195], [339, 178], [392, 188], [419, 211]]) {
-        rounded(ctx, x, y, 2, 9, 1, '#c2a5ce');
-        ellipse(ctx, x + 1, y - 5, 3, 7, '#caa2e0');
+        rounded(ctx, x, y, 2, 9, 1, '#435048');
+        ellipse(ctx, x + 1, y - 5, 3, 7, '#57675d');
       }
     }
   }

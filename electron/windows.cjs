@@ -1,12 +1,11 @@
 const path = require('node:path');
-const { BrowserWindow, Menu, dialog, screen } = require('electron');
+const { Menu, dialog, screen } = require('electron');
 const { watchOverlay } = require('./overlay.cjs');
 
-const root = path.join(__dirname, '..');
-const icon = path.join(root, 'assets', 'stone.png');
+const { createAppWindow, root } = require('./app-window.cjs');
 const titles = {
   welcome: 'Главное меню',
-  overlay: 'На рабочем столе',
+  overlay: 'Оверлей',
   widget: 'Мини-виджет',
   full: 'Полное окно'
 };
@@ -22,7 +21,7 @@ function positionFloatingWindow(entry, display) {
   if (entry.mode === 'widget') positionWidget(entry.window, display.workArea);
 }
 
-function createWindowManager(settings, quit, refreshMenu, petSnapshot) {
+function createWindowManager(settings, { quit, refreshMenu, petSnapshot, openOrganizer, setAutostart, canAutostart, canHide }) {
   let current;
   let pending;
 
@@ -37,8 +36,9 @@ function createWindowManager(settings, quit, refreshMenu, petSnapshot) {
     const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     if (current?.mode === mode) {
       if (display.id !== current.displayId) positionFloatingWindow(current, display);
-      current.window.show();
-      if (mode !== 'overlay') current.window.focus();
+      if (current.window.isMinimized()) current.window.restore();
+      if (mode === 'overlay') current.window.showInactive();
+      else current.window.show();
       return;
     }
 
@@ -57,32 +57,25 @@ function createWindowManager(settings, quit, refreshMenu, petSnapshot) {
       }
     };
 
-    const window = new BrowserWindow({
-      title: 'Камешек',
-      icon,
-      show: false,
-      autoHideMenuBar: true,
-      backgroundColor: mode === 'overlay' ? '#00000000' : '#161421',
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.cjs'),
-        contextIsolation: true,
-        sandbox: true,
-        nodeIntegration: false,
-        backgroundThrottling: mode !== 'overlay'
-      },
-      ...options[mode]
+    const window = createAppWindow({
+      ...options[mode],
+      backgroundColor: mode === 'overlay' ? '#00000000' : '#141414',
+      webPreferences: { backgroundThrottling: mode !== 'overlay' }
     });
-    window.removeMenu();
-    window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-    window.webContents.on('will-navigate', event => event.preventDefault());
 
     const entry = { window, mode, displayId: display.id };
     pending = entry;
     if (mode === 'widget') positionWidget(window, display.workArea);
     if (mode === 'overlay') {
-      window.setAlwaysOnTop(true, 'screen-saver');
+      window.setAlwaysOnTop(true, 'pop-up-menu');
       entry.overlay = watchOverlay(window);
     }
+    window.on('close', event => {
+      if (current === entry && canHide()) {
+        event.preventDefault();
+        window.hide();
+      }
+    });
     window.once('closed', () => {
       if (current === entry) {
         current = null;
@@ -92,6 +85,13 @@ function createWindowManager(settings, quit, refreshMenu, petSnapshot) {
     });
     function reveal() {
       if (pending !== entry) return;
+      if (mode !== 'welcome') {
+        try {
+          settings.update({ mode });
+        } catch (error) {
+          dialog.showErrorBox('Камешек', 'Не удалось сохранить режим окна. ' + error.message);
+        }
+      }
       const previous = current;
       current = entry;
       pending = null;
@@ -128,7 +128,7 @@ function createWindowManager(settings, quit, refreshMenu, petSnapshot) {
   }
 
   function setRoaming(value) {
-    settings.setRoaming(value);
+    settings.update({ roaming: value });
     for (const entry of [current, pending]) {
       entry?.window.webContents.send('stone:roaming-changed', settings.roaming);
     }
@@ -141,11 +141,17 @@ function createWindowManager(settings, quit, refreshMenu, petSnapshot) {
       ...Object.entries(titles).map(([mode, label]) => ({
         label,
         type: 'radio',
-        checked: current?.mode === mode,
+        checked: (current?.mode ?? settings.mode) === mode,
         click: () => show(mode)
       })),
       { label: 'Занятия и уход', enabled: Boolean(current && current.mode !== 'welcome'),
-        click: () => current?.window.webContents.send('stone:open-panel') },
+        click: () => {
+          if (!current) return;
+          show(current.mode);
+          current.window.webContents.send('stone:open-panel');
+        } },
+      { label: 'Заметки', click: () => openOrganizer('notes') },
+      { label: 'Будильники', click: () => openOrganizer('alarms') },
       { type: 'separator' },
       { label: 'Самостоятельное движение', type: 'checkbox', checked: settings.roaming, click: item => {
         try {
@@ -154,6 +160,15 @@ function createWindowManager(settings, quit, refreshMenu, petSnapshot) {
           dialog.showErrorBox('Камешек', 'Не удалось сохранить настройку. ' + error.message);
         }
       } },
+      { label: 'Автозапуск с Windows', type: 'checkbox', enabled: canAutostart, checked: settings.autostart,
+        click: item => {
+          try {
+            setAutostart(item.checked);
+          } catch (error) {
+            refreshMenu();
+            dialog.showErrorBox('Камешек', 'Не удалось изменить автозапуск. ' + error.message);
+          }
+        } },
       { type: 'separator' },
       { label: 'Выйти', click: quit }
     ]);

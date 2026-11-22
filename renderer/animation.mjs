@@ -9,16 +9,8 @@ const contour = new Path2D(
   'M -70 9 C -73 -8 -62 -26 -50 -39 C -32 -58 -7 -62 15 -55 C 35 -51 60 -38 69 -15 C 77 6 72 24 55 34 C 33 47 -30 44 -52 34 C -64 28 -69 19 -70 9 Z'
 );
 
-const speckles = Array.from({ length: 260 }, (_, index) => {
-  const grain = Number((Math.sin(index * 78.233 + 1) * 43758.5453).toFixed(6));
-  const fraction = grain - Math.floor(grain);
-  return [(index * 79 % 147) - 73, fraction * 107 - 61, 0.2 + (index % 7) * 0.22];
-});
-
 function face(ctx, { held, joy, blink, look, sleep, sip, puff }) {
-  ellipse(ctx, -44 + look, 11, 9, 4, '#f9acb97a');
-  ellipse(ctx, 44 + look, 11, 9, 4, '#f9acb97a');
-  ctx.strokeStyle = '#372641';
+  ctx.strokeStyle = '#161616';
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
 
@@ -29,23 +21,24 @@ function face(ctx, { held, joy, blink, look, sleep, sip, puff }) {
       ctx.quadraticCurveTo(x, joy ? -13 : sleep > 0.8 ? 7 : -1, x + 7, 0);
       ctx.stroke();
     } else {
-      const eye = ctx.createLinearGradient(x, -14, x, 8);
-      eye.addColorStop(0, '#21192d');
-      eye.addColorStop(1, '#4c3c5e');
-      const rx = held ? 7.5 : 9.5;
-      const ry = (held ? 13.2 : 11.8) * (1 - sleep * 0.94);
+      const eye = ctx.createRadialGradient(x - 4, -9, 1, x, -3, 15);
+      eye.addColorStop(0, '#343434');
+      eye.addColorStop(0.62, '#101010');
+      eye.addColorStop(1, '#000000');
+      const rx = held ? 11 : 13;
+      const ry = (held ? 17 : 15) * (1 - sleep * 0.93);
       ellipse(ctx, x, -3, rx, ry, eye);
-      ellipse(ctx, x - 2.2, -3 - ry * 0.36, 3, ry * 0.27, '#fff5ff');
-      ellipse(ctx, x + 3.4, -3 + ry * 0.42, 1.35, ry * 0.11, '#d9c3e9');
+      ellipse(ctx, x - 3.7, -3 - ry * 0.36, 3.4, ry * 0.25, '#f7f7f7');
+      ellipse(ctx, x + 4.3, -3 + ry * 0.42, 1.35, ry * 0.11, '#8d8d8d');
     }
   }
 
   if (held || sip || puff || sleep > 0.88) {
-    ellipse(ctx, look, 14, puff ? 6 : 3.7, sleep > 0.88 ? 3 : 4.8, '#3b2745');
-  } else {
+    ellipse(ctx, look, 14, puff ? 6 : 3.7, sleep > 0.88 ? 3 : 4.8, '#171717');
+  } else if (joy) {
     ctx.beginPath();
     ctx.moveTo(look - 6, 12);
-    ctx.quadraticCurveTo(look, joy ? 24 : 18, look + 6, 12);
+    ctx.quadraticCurveTo(look, 24, look + 6, 12);
     ctx.stroke();
   }
 }
@@ -58,7 +51,7 @@ function hearts(ctx, joy) {
     ctx.save();
     ctx.translate(x, y - (1 - joy) * 24);
     ctx.scale(size, size);
-    ctx.fillStyle = '#f8b2dc';
+    ctx.fillStyle = '#ebcfa6';
     ctx.beginPath();
     ctx.moveTo(0, 5);
     ctx.bezierCurveTo(-20, -9, -6, -18, 0, -9);
@@ -95,47 +88,16 @@ function poseFor(pet, reduced) {
 }
 
 function paintBody(ctx) {
-  const body = ctx.createRadialGradient(-30, -47, 4, 4, -10, 90);
-  body.addColorStop(0, '#fff1ee');
-  body.addColorStop(0.41, '#d9bde1');
-  body.addColorStop(0.74, '#a489b8');
-  body.addColorStop(1, '#624970');
+  const body = ctx.createRadialGradient(-24, -43, 7, 3, -20, 95);
+  body.addColorStop(0, '#ffffff');
+  body.addColorStop(0.53, '#f5f5f3');
+  body.addColorStop(0.83, '#e3e3df');
+  body.addColorStop(1, '#bdbdb7');
   ctx.fillStyle = body;
   ctx.fill(contour);
-  ctx.strokeStyle = '#553e67';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#aaaaa4';
+  ctx.lineWidth = 1;
   ctx.stroke(contour);
-
-  ctx.save();
-  ctx.clip(contour);
-  for (const [x, y, radius] of speckles) {
-    ellipse(ctx, x, y, radius, radius * 0.71, radius > 1.05 ? '#634a7d30' : '#fff7fc69');
-  }
-  ctx.restore();
-
-  ctx.beginPath();
-  ctx.moveTo(-47, -36);
-  ctx.bezierCurveTo(-32, -51, -12, -54, 3, -53);
-  ctx.strokeStyle = '#fff2f3a3';
-  ctx.lineWidth = 1.7;
-  ctx.lineCap = 'round';
-  ctx.stroke();
-
-  ctx.save();
-  ctx.clip(contour);
-  ctx.strokeStyle = '#f6deef40';
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.moveTo(-70, -22);
-  ctx.bezierCurveTo(-33, 4, 5, -40, 63, -13);
-  ctx.stroke();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = '#fceaf985';
-  ctx.beginPath();
-  ctx.moveTo(-70, -20);
-  ctx.bezierCurveTo(-32, 7, 7, -37, 63, -10);
-  ctx.stroke();
-  ctx.restore();
 }
 
 function effects(ctx, pose) {
@@ -179,8 +141,8 @@ function effects(ctx, pose) {
     }
     ctx.globalAlpha = 1;
   } else if (effect === 'hungry') {
-    ellipse(ctx, 54, -73, 22, 17, '#fff0f8');
-    ellipse(ctx, 39, -58, 3, 3, '#fff0f8');
+    ellipse(ctx, 54, -73, 22, 17, '#f6f0e6');
+    ellipse(ctx, 39, -58, 3, 3, '#f6f0e6');
     roll(ctx, 54, -73, 0.86);
   }
   if (sleep > 0.45) {
@@ -189,8 +151,8 @@ function effects(ctx, pose) {
       ctx.globalAlpha = Math.sin(Math.PI * t) * sleep;
       ctx.font = 'bold ' + (13 + Math.round(t * 7)) + 'px system-ui';
       ctx.lineWidth = 2.8;
-      ctx.strokeStyle = '#554866';
-      ctx.fillStyle = '#f4eaff';
+      ctx.strokeStyle = '#393939';
+      ctx.fillStyle = '#f7f5ef';
       ctx.strokeText('z', 48 + t * 28, -36 - t * 34);
       ctx.fillText('z', 48 + t * 28, -36 - t * 34);
     }
@@ -207,7 +169,7 @@ function desktopScene(ctx, pose, phase, opacity) {
     ctx.beginPath();
     ctx.roundRect(-105, -57, 210, 114, 54);
     ctx.clip();
-    const colors = { morning: '#dcb3ad', day: '#99c8cb', evening: '#c98f98', night: '#4f5279' };
+    const colors = { morning: '#36332e', day: '#303632', evening: '#3b322b', night: '#282b2c' };
     ctx.fillStyle = colors[phase];
     ctx.fillRect(-105, -57, 210, 114);
     ctx.translate(-105, -57);
@@ -218,8 +180,8 @@ function desktopScene(ctx, pose, phase, opacity) {
   const night = phase === 'night';
   const x = pose.trip ? -73 : -59;
   const y = pose.trip ? -38 : -53;
-  ellipse(ctx, x, y, 8, 8, night ? '#e0dffa' : '#ffe2a2');
-  if (night) ellipse(ctx, x + 2, y - 1, 5.5, 5.5, '#a6a2ca');
+  ellipse(ctx, x, y, 8, 8, night ? '#e1dfd6' : '#ffe2a2');
+  if (night) ellipse(ctx, x + 2, y - 1, 5.5, 5.5, '#a3a199');
   ctx.restore();
 }
 
@@ -235,8 +197,8 @@ function draw(ctx, pose, body) {
     }
   }
   const shadow = ctx.createRadialGradient(0, 0, 2, 0, 0, 78);
-  shadow.addColorStop(0, pose.held ? '#19102854' : '#120a207f');
-  shadow.addColorStop(1, '#10091a00');
+  shadow.addColorStop(0, pose.held ? '#11111154' : '#0c0c0c96');
+  shadow.addColorStop(1, '#11111100');
   ctx.save();
   ctx.translate(1, 44);
   ctx.scale(1.08, 0.18);
