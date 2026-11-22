@@ -1,0 +1,55 @@
+name: Windows portable
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Stone-Windows-x64
+          path: dist/Stone-Windows-x64.exe
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: Stone-Windows-x64
+      - name: Publish portable executable
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="windows-${GITHUB_RUN_NUMBER}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" Stone-Windows-x64.exe --clobber
+          else
+            gh release create "$tag" Stone-Windows-x64.exe \
+              --target "$GITHUB_SHA" \
+              --title "Камешек для Windows — сборка ${GITHUB_RUN_NUMBER}" \
+              --notes "Portable-приложение для Windows x64. Сборка коммита ${GITHUB_SHA}."
+          fi
