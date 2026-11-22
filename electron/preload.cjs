@@ -13,5 +13,13 @@ contextBridge.exposeInMainWorld('stone', {
   setActivity: busy => ipcRenderer.send('stone:activity', busy),
   petCommand: (action, value) => ipcRenderer.send('stone:pet-command', action, value),
   onPetState: callback => ipcRenderer.on('stone:pet-state', (_event, state) => callback(state)),
-  onOpenPanel: callback => ipcRenderer.on('stone:open-panel', () => callback())
+  onOpenPanel: callback => ipcRenderer.on('stone:open-panel', () => callback()),
+  openOrganizer: tab => ipcRenderer.send('stone:open-organizer', tab),
+  organizer: () => ipcRenderer.invoke('stone:organizer'),
+  updateOrganizer: (kind, action, data) => ipcRenderer.invoke('stone:organizer-update', kind, action, data),
+  onOrganizerState: callback => ipcRenderer.on('stone:organizer-state', (_event, state) => callback(state)),
+  onOrganizerTab: callback => ipcRenderer.on('stone:organizer-tab', (_event, tab) => callback(tab)),
+  alert: () => ipcRenderer.invoke('stone:alert-data'),
+  alertAction: (id, action) => ipcRenderer.invoke('stone:alert-action', id, action),
+  onAlert: callback => ipcRenderer.on('stone:alert', (_event, alert) => callback(alert))
 });

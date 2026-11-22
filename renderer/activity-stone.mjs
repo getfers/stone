@@ -1,4 +1,4 @@
-export const bodyColor = '#dec3e6';
+export const bodyColor = '#eeeeeb';
 
 // Объемная 3D-светотень и глубокие глазницы внутри тела
 export function drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody) {
@@ -15,13 +15,13 @@ export function drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody) {
     center.y,
     78 * s,
   );
-  grad.addColorStop(0, '#fff4e9dc');
+  grad.addColorStop(0, '#ffffffdc');
   grad.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
-  grad.addColorStop(1, '#49325783');
+  grad.addColorStop(1, '#45454565');
   ctx.fillStyle = grad;
   ctx.fillRect(center.x - 100 * s, center.y - 100 * s, 200 * s, 200 * s);
 
-  ctx.strokeStyle = '#fde6f282';
+  ctx.strokeStyle = '#ffffff40';
   ctx.lineWidth = 1.6 * s;
   ctx.beginPath();
   ctx.moveTo(center.x - 65 * s, center.y - 22 * s);

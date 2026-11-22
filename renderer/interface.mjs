@@ -21,6 +21,10 @@ for (const button of ['#mode-menu', '#panel-modes']) {
   select(button).addEventListener('click', () => api.showMenu());
 }
 
+for (const button of document.querySelectorAll('[data-organizer]')) {
+  button.addEventListener('click', () => api.openOrganizer(button.dataset.organizer));
+}
+
 const stage = select('#stage');
 const petButton = select('#pet');
 const pet = new Pet(mode, params.get('roaming') !== 'false');
@@ -337,7 +341,7 @@ function update(next) {
   }
   setText(placeName, state.trip ? trips[place].name : rooms[place]);
   setText(timeName, periods[state.phase]);
-  const status = state.sleeping ? 'Камешек тихонько спит.' : state.status || state.tripLog;
+  const status = state.sleeping ? 'Камешек тихонько спит.' : state.status || state.tripLog || 'Камешек дома.';
   setText(stageStatus, status);
   setText(deviceStatus, [periods[state.phase], status].filter(Boolean).join(' · '));
   const tripText = state.trip

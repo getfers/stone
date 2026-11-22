@@ -1,30 +1,28 @@
-const fs = require('node:fs');
 const path = require('node:path');
+const { readJson, writeJson } = require('./storage.cjs');
+
+const petModes = ['overlay', 'widget', 'full'];
 
 function loadSettings(userData) {
   const file = path.join(userData, 'settings.json');
-  let roaming = true;
-
-  try {
-    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
-    if (typeof saved?.roaming === 'boolean') roaming = saved.roaming;
-  } catch (error) {
-    if (error.code !== 'ENOENT') console.warn('Could not read settings:', error.message);
-  }
+  const saved = readJson(file);
+  let state = {
+    roaming: typeof saved.roaming === 'boolean' ? saved.roaming : true,
+    mode: petModes.includes(saved.mode) ? saved.mode : 'welcome',
+    autostart: saved.autostart === true
+  };
 
   return {
-    get roaming() {
-      return roaming;
-    },
-    setRoaming(value) {
-      if (value === roaming) return;
-      fs.mkdirSync(userData, { recursive: true });
-      const temp = file + '.tmp';
-      fs.writeFileSync(temp, JSON.stringify({ roaming: value }) + '\n');
-      fs.renameSync(temp, file);
-      roaming = value;
+    get roaming() { return state.roaming; },
+    get mode() { return state.mode; },
+    get autostart() { return state.autostart; },
+    update(patch) {
+      const next = { ...state, ...patch };
+      if (Object.keys(patch).every(key => next[key] === state[key])) return;
+      writeJson(file, next);
+      state = next;
     }
   };
 }
 
-module.exports = { loadSettings };
+module.exports = { loadSettings, petModes };

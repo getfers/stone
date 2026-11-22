@@ -420,7 +420,7 @@ export function createActivities(canvas, onCatchWin, equipped) {
   function drawSlide() {
     if (!slideScene.active) return;
     ctx.save();
-    ctx.strokeStyle = '#976a8d';
+    ctx.strokeStyle = '#7b6d60';
     ctx.lineWidth = 9;
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -531,9 +531,9 @@ export function createActivities(canvas, onCatchWin, equipped) {
       const enamel = ctx.createLinearGradient(b.x - hs, b.y - hs, b.x + hs, b.y + hs);
       enamel.addColorStop(0, '#ffe7e0');
       enamel.addColorStop(0.39, b.color);
-      enamel.addColorStop(1, '#685478');
+      enamel.addColorStop(1, '#565b50');
       ctx.fillStyle = enamel;
-      ctx.strokeStyle = '#594265';
+      ctx.strokeStyle = '#454741';
       ctx.lineWidth = 1.8;
       ctx.beginPath();
       ctx.roundRect(b.x - hs, b.y - hs, b.size, b.size, 5);
@@ -624,8 +624,8 @@ export function createActivities(canvas, onCatchWin, equipped) {
     ctx.moveTo(240, 0);
     ctx.lineTo(240, 18);
     ctx.stroke();
-    ctx.fillStyle = '#876986';
-    ctx.strokeStyle = '#483754';
+    ctx.fillStyle = '#756958';
+    ctx.strokeStyle = '#40392f';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.roundRect(231, 16, 18, 14, 3);
@@ -643,9 +643,9 @@ export function createActivities(canvas, onCatchWin, equipped) {
       }
       const glass = ctx.createRadialGradient(235, 40, 1, 240, 43, 19);
       glass.addColorStop(0, '#fff8df');
-      glass.addColorStop(1, isLit ? '#efbd63' : '#d5bae395');
+      glass.addColorStop(1, isLit ? '#efbd63' : '#dde1d895');
       ctx.fillStyle = glass;
-      ctx.strokeStyle = isLit ? '#ffe7af' : '#d8c7ec';
+      ctx.strokeStyle = isLit ? '#ffe7af' : '#d9ded5';
       ctx.lineWidth = 1.8;
       ctx.beginPath();
       ctx.moveTo(234, 28);
