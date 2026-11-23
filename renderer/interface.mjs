@@ -2,6 +2,7 @@ import { activities, createActivities } from './activities.mjs';
 import { createSprite } from './animation.mjs';
 import { landscape, paintIcon } from './art.mjs';
 import { care, clothes, needs, periods, rooms, trips } from './catalog.mjs';
+import { createFrameLoop } from './frame-loop.mjs';
 import { games, startGame } from './games.mjs';
 import { Pet } from './pet.mjs';
 
@@ -24,6 +25,7 @@ for (const button of ['#mode-menu', '#panel-modes']) {
 for (const button of document.querySelectorAll('[data-organizer]')) {
   button.addEventListener('click', () => api.openOrganizer(button.dataset.organizer));
 }
+select('#open-settings').addEventListener('click', () => api.openSettings());
 
 const stage = select('#stage');
 const petButton = select('#pet');
@@ -32,12 +34,15 @@ const sprite = createSprite(petButton, select('#sprite'));
 const roaming = select('#roaming');
 const settingsError = select('#settings-error');
 const landscapeCanvas = select('#landscape');
-const scenery = landscapeCanvas.getContext('2d');
+const scenery = mode === 'overlay' ? null : landscapeCanvas.getContext('2d');
 const panel = select('#pet-panel');
 let state;
 let lastPose;
 let lastHitTime = -Infinity;
 let lastHitArea = '';
+let fps = 30;
+let volume = 1;
+let activeSound;
 
 roaming.checked = pet.roaming;
 api.onRoamingChanged(value => {
@@ -162,9 +167,12 @@ for (const [id, item] of Object.entries(care)) {
     api.petCommand('care', id);
     if (id === 'water' || id === 'steam') {
       const file = id === 'water' ? 'sip' : 'puff';
-      const sound = new Audio(new URL('../assets/sounds/' + file + '.wav', import.meta.url));
-      sound.volume = 0.34;
-      sound.play().catch(() => {});
+      activeSound?.pause();
+      if (volume > 0) {
+        activeSound = new Audio(new URL('../assets/sounds/' + file + '.wav', import.meta.url));
+        activeSound.volume = 0.34 * volume;
+        activeSound.play().catch(() => {});
+      }
     }
     if (mode !== 'full') hidePanel();
   });
@@ -221,8 +229,8 @@ const stopButton = select('#stop-activity');
 const gamePlayer = select('#game-player');
 const gameOptions = select('#game-options');
 const gameBoard = select('#game-board');
-const theater = createActivities(activityCanvas, () => api.petCommand('game', 20), () => pet.equipped);
-let stopGame;
+let theater;
+let gameSession;
 let activeButton;
 let theaterRunning = false;
 let currentTab = 'care';
@@ -267,8 +275,8 @@ if (mode === 'full') {
 
 function finishActivity(focus = true) {
   if (!activeButton) return;
-  stopGame?.();
-  stopGame = null;
+  gameSession?.stop();
+  gameSession = null;
   if (theaterRunning) theater.stop();
   theaterRunning = false;
   api.setActivity(false);
@@ -296,7 +304,7 @@ function addActivity({ id, name, description }, interactive) {
     activityCanvas.hidden = interactive;
     stopButton.textContent = 'Закончить';
     if (interactive) {
-      stopGame = startGame(id, gameBoard, reward => {
+      gameSession = startGame(id, gameBoard, reward => {
         api.petCommand('game', reward);
         api.setActivity(false);
         stopButton.textContent = 'К играм';
@@ -304,6 +312,7 @@ function addActivity({ id, name, description }, interactive) {
       });
     } else {
       theaterRunning = true;
+      theater ??= createActivities(activityCanvas, () => api.petCommand('game', 20), () => pet.equipped);
       theater.start(id);
       activityCanvas.focus();
     }
@@ -332,12 +341,15 @@ function update(next) {
   const wasReady = Boolean(state);
   state = next;
   pet.update(next);
+  updateFps();
   const place = state.trip?.id ?? state.room;
-  stage.dataset.phase = state.phase;
+  if (stage.dataset.phase !== state.phase) stage.dataset.phase = state.phase;
   if (!wasReady || stage.dataset.room !== place) {
     stage.dataset.room = place;
-    scenery.clearRect(0, 0, landscapeCanvas.width, landscapeCanvas.height);
-    landscape(scenery, place);
+    if (scenery) {
+      scenery.clearRect(0, 0, landscapeCanvas.width, landscapeCanvas.height);
+      landscape(scenery, place);
+    }
   }
   setText(placeName, state.trip ? trips[place].name : rooms[place]);
   setText(timeName, periods[state.phase]);
@@ -357,8 +369,10 @@ function update(next) {
     setText(score, String(meter.value));
   }
   for (const { id, button } of wardrobe) {
-    button.disabled = !state.owned.includes(id);
-    button.setAttribute('aria-pressed', String(state.equipped[clothes[id].slot] === id));
+    const disabled = !state.owned.includes(id);
+    if (button.disabled !== disabled) button.disabled = disabled;
+    const pressed = String(state.equipped[clothes[id].slot] === id);
+    if (button.getAttribute('aria-pressed') !== pressed) button.setAttribute('aria-pressed', pressed);
   }
   room.value = state.room;
   clock.value = state.clock;
@@ -379,20 +393,46 @@ function publishHitArea() {
   }
 }
 
-let previousTime;
-function animate(time) {
-  requestAnimationFrame(animate);
-  if (pet.sleeping && pet.sleepBlend > 0.98 && !pet.held && time - previousTime < 32) return;
-  const dt = Math.min((time - (previousTime ?? time)) / 1000, 0.05);
-  previousTime = time;
+const frames = createFrameLoop((dt, time) => {
   if (theaterRunning && !theater.step(dt)) finishActivity();
   if (pet.bounds) {
     pet.step(dt);
     lastPose = sprite.paint(pet);
-    if (time - lastHitTime >= 30) {
+    if (mode === 'overlay' && time - lastHitTime >= 30) {
       publishHitArea();
       lastHitTime = time;
     }
   }
+});
+
+function updateFps() {
+  frames.setFps(pet.sleeping ? 10 : fps);
 }
-requestAnimationFrame(animate);
+
+api.onPreferences(settings => {
+  fps = settings.fps;
+  volume = settings.volume / 100;
+  pet.setSize(settings.size);
+  const brightness = settings.brightness === 100 ? 'none' : `brightness(${settings.brightness}%)`;
+  for (const element of [select('.scenery'), select('#sprite'), activityCanvas]) element.style.filter = brightness;
+  if (activeSound) activeSound.volume = 0.34 * volume;
+  updateFps();
+});
+
+let windowVisible = false;
+function syncAnimation() {
+  const visible = windowVisible && document.visibilityState === 'visible';
+  if (!visible) {
+    endPointer({});
+    activeSound?.pause();
+    lastHitArea = '';
+    lastHitTime = -Infinity;
+  }
+  gameSession?.setPaused(!visible);
+  frames.setRunning(visible);
+}
+api.onPetVisibility(visible => {
+  windowVisible = visible;
+  syncAnimation();
+});
+document.addEventListener('visibilitychange', syncAnimation);

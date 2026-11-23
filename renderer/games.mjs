@@ -12,18 +12,50 @@ export function startGame(id, host, onFinish) {
   output.setAttribute('role', 'status');
   host.replaceChildren(output);
   let finished = false;
+  let pausedAt;
+  let pausedTime = 0;
 
-  const after = (ms, callback) => {
-    const timer = setTimeout(() => {
+  function schedule(timer) {
+    timer.started = performance.now();
+    timer.id = setTimeout(() => {
       timers.delete(timer);
-      callback();
-    }, ms);
+      timer.callback();
+    }, timer.remaining);
+  }
+
+  function after(remaining, callback) {
+    const timer = { remaining, callback };
     timers.add(timer);
-  };
+    if (pausedAt === undefined) schedule(timer);
+  }
+
+  function gameTime() {
+    return (pausedAt ?? performance.now()) - pausedTime;
+  }
+
+  function setPaused(paused) {
+    if (finished || paused === (pausedAt !== undefined)) return;
+    const now = performance.now();
+    if (paused) {
+      pausedAt = now;
+      for (const timer of timers) {
+        clearTimeout(timer.id);
+        timer.remaining = Math.max(0, timer.remaining - (now - timer.started));
+      }
+    } else {
+      pausedTime += now - pausedAt;
+      pausedAt = undefined;
+      for (const timer of timers) schedule(timer);
+    }
+    for (const animation of host.getAnimations({ subtree: true })) {
+      if (paused) animation.pause();
+      else animation.play();
+    }
+  }
 
   function stop() {
     controller.abort();
-    for (const timer of timers) clearTimeout(timer);
+    for (const timer of timers) clearTimeout(timer.id);
     timers.clear();
   }
 
@@ -113,7 +145,7 @@ export function startGame(id, host, onFinish) {
     host.append(board);
     let count = 0;
     let position = -1;
-    const endsAt = performance.now() + 15000;
+    const endsAt = gameTime() + 15000;
 
     function place() {
       position = (position + 1 + Math.floor(Math.random() * 5)) % 6;
@@ -121,7 +153,7 @@ export function startGame(id, host, onFinish) {
       star.style.gridRow = String(Math.floor(position / 3) + 1);
     }
     function update() {
-      const remaining = Math.max(0, Math.ceil((endsAt - performance.now()) / 1000));
+      const remaining = Math.max(0, Math.ceil((endsAt - gameTime()) / 1000));
       if (!remaining) {
         star.disabled = true;
         finish('Искр поймано — ' + count + '.', Math.min(24, 4 + count));
@@ -132,7 +164,7 @@ export function startGame(id, host, onFinish) {
     }
 
     star.addEventListener('click', () => {
-      if (performance.now() >= endsAt) return;
+      if (gameTime() >= endsAt) return;
       count++;
       place();
     }, { signal });
@@ -143,5 +175,5 @@ export function startGame(id, host, onFinish) {
     star.focus();
     update();
   }
-  return stop;
+  return { stop, setPaused };
 }

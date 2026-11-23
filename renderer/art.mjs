@@ -79,6 +79,29 @@ export function roll(ctx, x, y, scale = 1, angle = 0) {
   ctx.restore();
 }
 
+const fabric = {
+  scarfBand: new Path2D('M -69 -16 C -55 -6 -29 -2 0 -2 C 31 -2 55 -7 70 -18 C 73 -10 69 -1 61 5 C 47 16 20 20 -2 20 C -30 20 -52 14 -62 4 C -69 -2 -72 -9 -69 -16 Z'),
+  scarfTail: new Path2D('M 51 0 C 60 -4 66 -6 71 -10 C 69 2 68 10 72 21 C 74 28 78 35 81 39 L 61 47 C 56 39 50 29 49 19 C 48 12 49 6 51 0 Z'),
+  partyHat: new Path2D('M -27 8 L -5 -39 Q -3 -42 0 -38 L 28 8 Q 8 18 -27 8 Z'),
+  crown: new Path2D('M -31 11 L -37 -17 Q -37 -21 -33 -18 L -18 -7 L -4 -25 Q 0 -30 4 -25 L 18 -7 L 33 -18 Q 37 -21 37 -17 L 31 11 Q 0 16 -31 11 Z'),
+  baseballCap: new Path2D('M -35 7 C -35 -15 -22 -28 -1 -29 C 19 -30 34 -16 37 4 Q 8 14 -35 7 Z'),
+  capVisor: new Path2D('M -11 8 Q 13 -1 37 4 Q 51 9 57 14 Q 42 22 14 16 Z'),
+  cape: new Path2D('M -49 -17 Q -67 -5 -72 26 Q -73 36 -84 43 Q -56 54 -20 43 Q 16 58 44 44 Q 67 49 83 38 Q 66 18 66 6 Q 63 -11 49 -17 Q 4 5 -49 -17 Z'),
+  capeCollar: new Path2D('M -60 -16 Q -43 -10 0 -2 Q 40 -8 61 -19 L 55 -7 Q 43 4 7 8 L 0 13 L -8 8 Q -45 3 -57 -6 Z'),
+  tie: new Path2D('M -5 0 L 5 0 L 11 21 L 0 31 L -11 21 Z'),
+  star: new Path2D('M 0 -16 L 4.8 -5 L 16 -4 L 7.7 3.8 L 10.4 15 L 0 9 L -10.4 15 L -7.7 3.8 L -16 -4 L -4.8 -5 Z'),
+  headband: new Path2D('M -69 44 C -71 5 -42 -17 6 -18 C 51 -18 80 5 81 44'),
+  scarfFold: new Path2D('M -61 -8 C -32 8 26 11 60 -6 M 60 12 Q 61 24 69 34'),
+  capSeam: new Path2D('M 0 -28 Q -13 -20 -13 3')
+};
+
+function fillPath(ctx, path, fill, stroke) {
+  ctx.fillStyle = fill;
+  ctx.fill(path);
+  ctx.strokeStyle = stroke;
+  ctx.stroke(path);
+}
+
 export function garment(ctx, id, x, y, scale = 1) {
   ctx.save();
   ctx.translate(x, y);
@@ -102,14 +125,16 @@ export function garment(ctx, id, x, y, scale = 1) {
     ctx.stroke();
     rounded(ctx, -33, -2, 67, 12, 6, leaf ? '#829c53' : '#90cbb9', ctx.strokeStyle);
     ellipse(ctx, leaf ? 13 : -8, -29, 8, 6, leaf ? '#dfd694' : '#d8fae4');
-  } else if (id === 'glasses') {
+  } else if (['glasses', 'squareGlasses', 'sunglasses'].includes(id)) {
+    const dark = id === 'sunglasses';
+    const radius = { glasses: 13, squareGlasses: 4, sunglasses: 9 }[id];
     ctx.strokeStyle = '#41464a';
     for (const left of [-40, 5]) {
-      rounded(ctx, left, -13, 35, 28, 13, '#cee0db32', '#41464a');
+      rounded(ctx, left, -15, 35, 31, radius, dark ? '#313235' : '#cee0db24', '#41464a');
       ctx.beginPath();
-      ctx.moveTo(left + 6, -4);
-      ctx.lineTo(left + 12, -8);
-      ctx.strokeStyle = '#f8f7ec9e';
+      ctx.moveTo(left + 7, -4);
+      ctx.lineTo(left + 14, -10);
+      ctx.strokeStyle = dark ? '#aaa79b' : '#f8f7ec9e';
       ctx.stroke();
     }
     ctx.strokeStyle = '#41464a';
@@ -118,17 +143,61 @@ export function garment(ctx, id, x, y, scale = 1) {
     ctx.quadraticCurveTo(0, -7, 5, -1);
     ctx.stroke();
   } else if (id === 'scarf') {
-    ctx.fillStyle = '#a5504d';
-    ctx.strokeStyle = '#6b3734';
+    fillPath(ctx, fabric.scarfTail, '#a45654', '#693939');
+    fillPath(ctx, fabric.scarfBand, '#af605b', '#693939');
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#df938388';
+    ctx.stroke(fabric.scarfFold);
+    ctx.strokeStyle = '#cf8277';
     ctx.beginPath();
-    ctx.moveTo(-53, -10);
-    ctx.quadraticCurveTo(-5, 12, 49, -10);
-    ctx.lineTo(45, 4);
-    ctx.quadraticCurveTo(18, 20, -46, 6);
-    ctx.closePath();
-    ctx.fill();
+    for (let i = 0; i < 6; i++) {
+      ctx.moveTo(61 + i * 3.5, 46 - i * 1.38);
+      ctx.lineTo(63 + i * 3.5, 51 - i * 1.38);
+    }
     ctx.stroke();
-    rounded(ctx, 23, 0, 14, 19, 4, '#cf7467', '#6b3734');
+  } else if (id === 'partyHat') {
+    fillPath(ctx, fabric.partyHat, '#bb786d', '#714c43');
+    ellipse(ctx, -3, -42, 6.3, 6.3, '#edcfa4');
+    for (const [x, y, r] of [[-4, -23, 3], [7, -10, 3.5], [-12, -3, 3], [16, 4, 2.8]]) {
+      ellipse(ctx, x, y, r, r, '#f1d7b0');
+    }
+  } else if (id === 'headphones') {
+    ctx.strokeStyle = '#2e3031';
+    ctx.lineWidth = 8;
+    ctx.stroke(fabric.headband);
+    ctx.strokeStyle = '#878277';
+    ctx.lineWidth = 2;
+    ctx.stroke(fabric.headband);
+    for (const x of [-78, 72]) {
+      rounded(ctx, x, 36, 17, 32, 7, '#4a4a46', '#2e3031');
+      rounded(ctx, x + 4, 41, 9, 22, 4, '#a29886');
+    }
+  } else if (id === 'crown') {
+    fillPath(ctx, fabric.crown, '#dfbf79', '#8d713d');
+    rounded(ctx, -30, 5, 60, 10, 4, '#e9ce8e', '#8d713d');
+    ellipse(ctx, 0, -6, 4.2, 5.5, '#f7e7b3');
+  } else if (id === 'baseballCap') {
+    fillPath(ctx, fabric.baseballCap, '#82998c', '#48574e');
+    ctx.strokeStyle = '#b4c3b2';
+    ctx.lineWidth = 1.5;
+    ctx.stroke(fabric.capSeam);
+    ctx.lineWidth = 2.3;
+    fillPath(ctx, fabric.capVisor, '#60786b', '#48574e');
+    ellipse(ctx, -1, -29, 4.5, 2.3, '#a9b9a6');
+  } else if (id === 'cape' || id === 'capeCollar') {
+    fillPath(ctx, fabric[id], id === 'cape' ? '#705752' : '#ab7b69', '#503c39');
+    if (id === 'capeCollar') ellipse(ctx, 0, 8, 5, 5, '#e3c48a');
+  } else if (id === 'tie') {
+    fillPath(ctx, fabric.tie, '#768897', '#48545e');
+    rounded(ctx, -7, -8, 14, 11, 3, '#a7b2b5', '#48545e');
+  } else if (id === 'flower') {
+    for (let i = 0; i < 5; i++) {
+      const angle = i * Math.PI * 2 / 5 - Math.PI / 2;
+      ellipse(ctx, 8 * Math.cos(angle), 8 * Math.sin(angle), 6.7, 6.7, '#dcacaa');
+    }
+    ellipse(ctx, 0, 0, 5, 5, '#e6c47f');
+  } else if (id === 'star') {
+    fillPath(ctx, fabric.star, '#ebd095', '#957a51');
   } else if (id === 'bow') {
     ctx.strokeStyle = '#92475f';
     ctx.fillStyle = '#ef9da8';
@@ -196,7 +265,16 @@ export function paintIcon(canvas, id) {
     ellipse(ctx, 17, 16, 5, 4, '#e8fbff');
     ellipse(ctx, 28, 10, 4, 4, '#e8fbff');
   } else if (id === 'play') ball(ctx, 20, 20, 13);
-  else garment(ctx, id, 20, id === 'cap' || id === 'leaf' ? 25 : 20, 0.43);
+  else {
+    const [x, y, scale] = {
+      cap: [20, 25, 0.43], leaf: [20, 25, 0.43], scarf: [18, 16, 0.22],
+      partyHat: [20, 29, 0.51], headphones: [19, 14, 0.22], crown: [20, 23, 0.43],
+      baseballCap: [17, 22, 0.39], cape: [20, 16, 0.22], tie: [20, 14, 0.78],
+      star: [20, 20, 0.83], flower: [20, 20, 0.93]
+    }[id] ?? [20, 20, 0.43];
+    garment(ctx, id, x, y, scale);
+    if (id === 'cape') garment(ctx, 'capeCollar', x, y, scale);
+  }
 }
 
 function terrain(ctx, points, fill) {

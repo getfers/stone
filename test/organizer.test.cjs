@@ -96,9 +96,20 @@ test('legacy settings are migrated and the last intact data is available after f
   fs.writeFileSync(file, '{"roaming":false}');
   const settings = loadSettings(dir);
   assert.equal(settings.mode, 'welcome');
+  assert.equal(settings.startupWindow(false), 'welcome');
+  assert.equal(settings.startupWindow(true), null);
+  assert.deepEqual(settings.presentation(), {
+    fps: 30, brightness: 100, size: 'medium', volume: 100, startupMode: 'default', autostart: false
+  });
   settings.update({ mode: 'widget' });
+  settings.update({ fps: 60, brightness: 78, size: 'large', volume: 0, startupMode: 'overlay' });
   settings.update({ autostart: true });
-  assert.equal(loadSettings(dir).autostart, true);
+  const reopened = loadSettings(dir);
+  assert.deepEqual(reopened.presentation(), {
+    fps: 60, brightness: 78, size: 'large', volume: 0, startupMode: 'overlay', autostart: true
+  });
+  assert.equal(reopened.startupWindow(true), 'overlay');
+  assert.equal(reopened.startupWindow(false), 'overlay');
   fs.writeFileSync(file, '{');
   const recovered = loadSettings(dir);
   assert.equal(recovered.mode, 'widget');

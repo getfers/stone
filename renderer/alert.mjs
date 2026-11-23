@@ -1,5 +1,6 @@
 import { createSprite } from './animation.mjs';
-import { alarmAudio } from './organizer-catalog.mjs';
+import { createFrameLoop } from './frame-loop.mjs';
+import { alarmAudio, alarmVolume } from './organizer-catalog.mjs';
 
 const api = window.stone;
 const $ = id => document.getElementById(id);
@@ -35,14 +36,16 @@ function show(alert) {
   $('alert-error').textContent = '';
   start = performance.now();
   audio?.pause();
+  audio = undefined;
   if (alarm) {
-    audio = alarmAudio(alert.sound);
+    audio = alarmAudio(alert.sound, alert.volume);
     audio.loop = true;
     audio.play().catch(() => {
       if (current?.id === alert.id) $('alert-error').textContent = 'Не удалось воспроизвести сигнал.';
     });
     dismiss.focus({ preventScroll: true });
   }
+  syncAnimation();
 }
 
 async function respond(action) {
@@ -61,14 +64,22 @@ dismiss.addEventListener('click', () => respond('dismiss'));
 api.onAlert(show);
 api.alert().then(show).catch(() => {});
 
-function animate(now) {
-  if (current) {
-    pet.time = (now - start) / 1000;
-    const ringing = current.kind === 'alarm';
-    pet.tilt = ringing && !reducedMotion.matches ? Math.sin(pet.time * 18) * 0.17 : 0;
-    pet.happyUntil = !ringing && pet.time < 0.9 ? 0.9 : 0;
-    sprite.paint(pet);
-  }
-  requestAnimationFrame(animate);
+const frames = createFrameLoop((_dt, now) => {
+  pet.time = (now - start) / 1000;
+  const ringing = current.kind === 'alarm';
+  pet.tilt = ringing && !reducedMotion.matches ? Math.sin(pet.time * 18) * 0.17 : 0;
+  pet.happyUntil = !ringing && pet.time < 0.9 ? 0.9 : 0;
+  sprite.paint(pet);
+});
+
+function syncAnimation() {
+  frames.setRunning(Boolean(current) && document.visibilityState === 'visible');
 }
-requestAnimationFrame(animate);
+document.addEventListener('visibilitychange', syncAnimation);
+
+function applyPreferences(settings) {
+  frames.setFps(settings.fps);
+  if (audio) audio.volume = alarmVolume(settings.volume);
+}
+api.onPreferences(applyPreferences);
+api.preferences().then(applyPreferences).catch(() => {});

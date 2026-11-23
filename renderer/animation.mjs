@@ -1,4 +1,5 @@
 import { ball, bottle, ellipse, garment, landscape, roll } from './art.mjs';
+import { drawClothes, drawEyes } from './stone-art.mjs';
 
 const width = 256;
 const height = 210;
@@ -6,42 +7,8 @@ const originX = width / 2;
 const originY = 111;
 
 const contour = new Path2D(
-  'M -70 9 C -73 -8 -62 -26 -50 -39 C -32 -58 -7 -62 15 -55 C 35 -51 60 -38 69 -15 C 77 6 72 24 55 34 C 33 47 -30 44 -52 34 C -64 28 -69 19 -70 9 Z'
+  'M -72 2 C -72 -30 -43 -59 -5 -60 C 34 -61 68 -39 72 -7 C 76 24 58 47 22 51 C -19 56 -71 45 -72 2 Z'
 );
-
-function face(ctx, { held, joy, blink, look, sleep, sip, puff }) {
-  ctx.strokeStyle = '#161616';
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-
-  for (const x of [-22 + look, 20 + look]) {
-    if (joy > 0.08 || blink || sleep > 0.88 || sip) {
-      ctx.beginPath();
-      ctx.moveTo(x - 7, 0);
-      ctx.quadraticCurveTo(x, joy ? -13 : sleep > 0.8 ? 7 : -1, x + 7, 0);
-      ctx.stroke();
-    } else {
-      const eye = ctx.createRadialGradient(x - 4, -9, 1, x, -3, 15);
-      eye.addColorStop(0, '#343434');
-      eye.addColorStop(0.62, '#101010');
-      eye.addColorStop(1, '#000000');
-      const rx = held ? 11 : 13;
-      const ry = (held ? 17 : 15) * (1 - sleep * 0.93);
-      ellipse(ctx, x, -3, rx, ry, eye);
-      ellipse(ctx, x - 3.7, -3 - ry * 0.36, 3.4, ry * 0.25, '#f7f7f7');
-      ellipse(ctx, x + 4.3, -3 + ry * 0.42, 1.35, ry * 0.11, '#8d8d8d');
-    }
-  }
-
-  if (held || sip || puff || sleep > 0.88) {
-    ellipse(ctx, look, 14, puff ? 6 : 3.7, sleep > 0.88 ? 3 : 4.8, '#171717');
-  } else if (joy) {
-    ctx.beginPath();
-    ctx.moveTo(look - 6, 12);
-    ctx.quadraticCurveTo(look, 24, look + 6, 12);
-    ctx.stroke();
-  }
-}
 
 function hearts(ctx, joy) {
   if (!joy) return;
@@ -76,7 +43,7 @@ function poseFor(pet, reduced) {
   const swell = puff ? Math.sin((age - 0.35) / 1.1 * Math.PI) * 0.09 * factor : 0;
   return {
     joy: joy * (1 - sleep), held: pet.held, look: pet.look * 8,
-    sleep, sip, puff, age, effect, time: pet.time, equipped: pet.equipped,
+    sleep, sip, age, effect, time: pet.time, equipped: pet.equipped,
     phase: pet.phase, previousPhase: pet.previousPhase, phaseBlend: pet.phaseBlend,
     trip: pet.trip, desktop: pet.mode === 'overlay', reduced,
     blink: pet.time >= pet.nextBlink && pet.time < pet.nextBlink + 0.14,
@@ -88,11 +55,10 @@ function poseFor(pet, reduced) {
 }
 
 function paintBody(ctx) {
-  const body = ctx.createRadialGradient(-24, -43, 7, 3, -20, 95);
+  const body = ctx.createLinearGradient(-43, -56, 42, 67);
   body.addColorStop(0, '#ffffff');
-  body.addColorStop(0.53, '#f5f5f3');
-  body.addColorStop(0.83, '#e3e3df');
-  body.addColorStop(1, '#bdbdb7');
+  body.addColorStop(0.49, '#f8f8f6');
+  body.addColorStop(1, '#deded8');
   ctx.fillStyle = body;
   ctx.fill(contour);
   ctx.strokeStyle = '#aaaaa4';
@@ -185,7 +151,7 @@ function desktopScene(ctx, pose, phase, opacity) {
   ctx.restore();
 }
 
-function draw(ctx, pose, body) {
+function draw(ctx, pose, body, shadow) {
   ctx.save();
   ctx.translate(originX, originY);
   if (pose.desktop) {
@@ -196,25 +162,17 @@ function draw(ctx, pose, body) {
       desktopScene(ctx, pose, pose.phase, 1);
     }
   }
-  const shadow = ctx.createRadialGradient(0, 0, 2, 0, 0, 78);
-  shadow.addColorStop(0, pose.held ? '#11111154' : '#0c0c0c96');
-  shadow.addColorStop(1, '#11111100');
-  ctx.save();
-  ctx.translate(1, 44);
-  ctx.scale(1.08, 0.18);
-  ellipse(ctx, 0, 0, 78, 78, shadow);
-  ctx.restore();
+  if (pose.held) ctx.globalAlpha = 0.55;
+  ctx.drawImage(shadow, -84, 39, 168, 32);
+  ctx.globalAlpha = 1;
 
   hearts(ctx, pose.joy);
   ctx.translate(0, pose.dy);
   ctx.transform(pose.sx, 0, pose.skew, pose.sy, 0, 0);
-  ctx.drawImage(body, -76, -63, 152, 111);
-  face(ctx, pose);
-  const { hat, face: eyewear, outfit, pin } = pose.equipped;
-  if (hat) garment(ctx, hat, -6, -51);
-  if (eyewear) garment(ctx, eyewear, pose.look, -3);
-  if (outfit) garment(ctx, outfit, outfit === 'bow' ? 24 : 0, 31);
-  if (pin) garment(ctx, pin, -32, 25, 0.7);
+  if (pose.equipped.outfit === 'cape') garment(ctx, 'cape', 0, 31);
+  ctx.drawImage(body, -77, -64, 154, 120);
+  drawEyes(ctx, pose.look, -3, pose);
+  drawClothes(ctx, pose.equipped, pose.look, -3);
   ctx.restore();
   ctx.save();
   ctx.translate(originX, originY);
@@ -224,45 +182,76 @@ function draw(ctx, pose, body) {
 
 // Rows follow the silhouette so its transparent corners and shadow remain click-through.
 const hitRows = [
-  [-57, -46, -28, 29], [-46, -32, -47, 47], [-32, -16, -59, 60],
-  [-16, 7, -68, 70], [7, 20, -67, 69], [20, 32, -60, 60],
-  [32, 40, -45, 44], [40, 43, -29, 30]
+  [-60, -53, -23, 21], [-53, -43, -42, 43], [-43, -28, -57, 56],
+  [-28, -10, -66, 68], [-10, 15, -72, 73], [15, 30, -66, 68],
+  [30, 44, -52, 56], [44, 52, -28, 39]
 ];
+const garmentHitRows = {
+  cap: [[-84, -71, -27, 10], [-71, -42, -38, 26]],
+  leaf: [[-85, -71, -27, 16], [-71, -42, -38, 26]],
+  partyHat: [[-99, -85, -15, -3], [-85, -67, -21, 5], [-67, -43, -31, 21]],
+  headphones: [[-74, -57, -43, 53], [-15, 17, -84, -65], [-15, 17, 66, 83]],
+  crown: [[-77, -62, -13, 1], [-71, -38, -41, 29]],
+  baseballCap: [[-82, -67, -27, 18], [-67, -34, -40, 49]],
+  scarf: [[20, 44, -69, 70], [44, 65, 48, 77], [65, 82, 53, 82]],
+  cape: [[33, 60, -70, 68], [60, 77, -83, 82]],
+  tie: [[48, 63, -9, 9]]
+};
+
+function createShadow() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 168;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  const fill = ctx.createRadialGradient(0, 0, 2, 0, 0, 83);
+  fill.addColorStop(0, '#0c0c0c96');
+  fill.addColorStop(1, '#11111100');
+  ctx.translate(84, 16);
+  ctx.scale(1, 0.18);
+  ellipse(ctx, 0, 0, 83, 83, fill);
+  return canvas;
+}
 
 export function createSprite(button, canvas) {
   const ctx = canvas.getContext('2d');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const body = document.createElement('canvas');
   const bodyContext = body.getContext('2d');
+  const shadow = createShadow();
   let ratio;
+  let transform;
+  let previousScale;
 
   return {
     paint(pet) {
       const scale = pet.scale;
-      const dpr = window.devicePixelRatio;
+      const dpr = Math.min(window.devicePixelRatio, 2);
       if (ratio !== dpr * scale) {
         ratio = dpr * scale;
         canvas.width = Math.ceil(width * ratio);
         canvas.height = Math.ceil(height * ratio);
-        button.style.width = width * scale + 'px';
-        button.style.height = height * scale + 'px';
-        body.width = Math.ceil(152 * ratio);
-        body.height = Math.ceil(111 * ratio);
-        bodyContext.setTransform(body.width / 152, 0, 0, body.height / 111, 0, 0);
-        bodyContext.translate(76, 63);
+        body.width = Math.ceil(154 * ratio);
+        body.height = Math.ceil(120 * ratio);
+        bodyContext.setTransform(body.width / 154, 0, 0, body.height / 120, 0, 0);
+        bodyContext.translate(77, 64);
         paintBody(bodyContext);
       }
-      button.style.transform = `translate(${pet.x - originX * scale}px, ${pet.y - originY * scale}px)`;
+      if (previousScale !== scale) {
+        previousScale = scale;
+        button.style.width = width * scale + 'px';
+        button.style.height = height * scale + 'px';
+      }
+      const nextTransform = `translate(${pet.x - originX * scale}px, ${pet.y - originY * scale}px)`;
+      if (transform !== nextTransform) button.style.transform = transform = nextTransform;
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       ctx.clearRect(0, 0, width + 1, height + 1);
       const pose = poseFor(pet, reduced.matches);
-      draw(ctx, pose, body);
+      draw(ctx, pose, body, shadow);
       return pose;
     },
     hitArea(pet, pose) {
-      const rows = [...hitRows];
-      if (pose.equipped.hat) rows.push([-81, -72, -23, 11], [-72, -60, -33, 18], [-60, -43, -39, 27]);
-      if (pose.equipped.outfit === 'scarf') rows.push([41, 50, 23, 37]);
+      const { hat, outfit } = pose.equipped;
+      const rows = [...hitRows, ...(garmentHitRows[hat] ?? []), ...(garmentHitRows[outfit] ?? [])];
       return rows.map(([top, bottom, left, right]) => {
         const shift = (top + bottom) * 0.5 * pose.skew;
         return {

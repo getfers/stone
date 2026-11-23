@@ -1,9 +1,5 @@
 import { garment, roll } from './art.mjs';
-import {
-  bodyColor,
-  drawGlossy3DBody,
-  drawGlossyEyes,
-} from './activity-stone.mjs';
+import { drawClothes, drawEyes } from './stone-art.mjs';
 
 export const activities = [
   {
@@ -19,7 +15,6 @@ export const activities = [
 export function createActivities(canvas, onCatchWin, equipped) {
   const ctx = canvas.getContext('2d');
   const keys = new Set();
-  const emotions = ['classic', 'happy', 'sad', 'surprised'];
   const NUM_POINTS = 16;
   const STIFFNESS = 0.075;
   const NEIGHBOR_PULL = 0.14;
@@ -590,6 +585,14 @@ export function createActivities(canvas, onCatchWin, equipped) {
     }
     if (bulbScene.flashAlpha > 0)
       bulbScene.flashAlpha = Math.max(0, bulbScene.flashAlpha - 0.06);
+    for (let i = bulbScene.shards.length - 1; i >= 0; i--) {
+      const shard = bulbScene.shards[i];
+      shard.x += shard.vx;
+      shard.y += shard.vy;
+      shard.vy += 0.35;
+      shard.alpha -= 0.02;
+      if (shard.alpha <= 0) bulbScene.shards.splice(i, 1);
+    }
   }
   function drawLadder() {
     if (!bulbScene.active || !bulbScene.ladderVisible) return;
@@ -666,18 +669,9 @@ export function createActivities(canvas, onCatchWin, equipped) {
       ctx.lineTo(246, 30);
       ctx.stroke();
     }
-    for (let i = bulbScene.shards.length - 1; i >= 0; i--) {
-      let s = bulbScene.shards[i];
-      s.x += s.vx;
-      s.y += s.vy;
-      s.vy += 0.35;
-      s.alpha -= 0.02;
-      if (s.alpha <= 0) {
-        bulbScene.shards.splice(i, 1);
-        continue;
-      }
-      ctx.fillStyle = 'rgba(254, 240, 138, ' + s.alpha.toFixed(2) + ')';
-      ctx.fillRect(s.x, s.y, s.size, s.size);
+    for (const shard of bulbScene.shards) {
+      ctx.fillStyle = 'rgba(254, 240, 138, ' + shard.alpha.toFixed(2) + ')';
+      ctx.fillRect(shard.x, shard.y, shard.size, shard.size);
     }
     if (bulbScene.flashAlpha > 0) {
       ctx.fillStyle =
@@ -706,6 +700,8 @@ export function createActivities(canvas, onCatchWin, equipped) {
     center.vy = 0;
     initNodes();
   }
+
+  canvas.addEventListener('blur', () => keys.clear());
 
   function stop() {
     for (const scene of Object.values(scenes)) scene.active = false;
@@ -741,68 +737,29 @@ export function createActivities(canvas, onCatchWin, equipped) {
   }
 
   function paintStone() {
-    const s = 1;
+    const clothes = equipped();
+    if (clothes.outfit === 'cape') garment(ctx, 'cape', center.x, center.y + 31 * 0.93, 0.93);
     drawLiquidBody();
-    ctx.fillStyle = bodyColor;
+    ctx.fillStyle = '#f1f1ed';
     ctx.fill();
-    const lookX =
-      Math.max(-11 * s, Math.min(11 * s, center.vx * 1.4));
-    const lookY = Math.max(-9 * s, Math.min(9 * s, center.vy * 0.65));
-    const fx = center.x + lookX;
-    const fy = center.y + lookY;
-    drawGlossy3DBody(ctx, center, fx, fy, s, drawLiquidBody);
-    const emo = emotions[currentEmotion];
-    const isBlinking = frame % 170 > 162 && emo !== 'surprised';
-    ctx.strokeStyle = 'rgba(24, 24, 27, 0.75)';
-    ctx.lineWidth = Math.max(2.5, 4.5 * s);
-    ctx.lineCap = 'round';
-    const bulbLookOffset =
-      bulbScene.active && bulbScene.timer > 110 && bulbScene.timer < 295
-        ? -4.5
-        : 0;
-    if (emo === 'classic') {
-      drawGlossyEyes(
-        ctx,
-        fx,
-        fy,
-        s,
-        lookX,
-        bulbLookOffset,
-        isBlinking,
-        isBlinking,
-      );
-    } else if (emo === 'happy') {
-      drawGlossyEyes(
-        ctx,
-        fx,
-        fy,
-        s,
-        lookX,
-        -2.5 + bulbLookOffset,
-        isBlinking,
-        isBlinking,
-      );
-      ctx.beginPath();
-      ctx.arc(fx, fy + 22 * s, 13 * s, 0.15 * Math.PI, 0.85 * Math.PI);
-      ctx.stroke();
-    } else if (emo === 'sad') {
-      drawGlossyEyes(ctx, fx, fy, s, lookX, 3.5, isBlinking, isBlinking);
-      ctx.beginPath();
-      ctx.arc(fx, fy + 36 * s, 12 * s, 1.15 * Math.PI, 1.85 * Math.PI);
-      ctx.stroke();
-    } else if (emo === 'surprised') {
-      drawGlossyEyes(ctx, fx, fy, s, lookX, bulbLookOffset, false, false);
-      ctx.fillStyle = '#18181b';
-      ctx.beginPath();
-      ctx.ellipse(fx, fy + 26 * s, 7 * s, 9 * s, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    const { hat, face, outfit, pin } = equipped();
-    if (hat) garment(ctx, hat, center.x, center.y - 49, 0.9);
-    if (face) garment(ctx, face, fx, fy - 4, 0.96);
-    if (outfit) garment(ctx, outfit, center.x + (outfit === 'bow' ? 20 : 0), center.y + 37, 0.81);
-    if (pin) garment(ctx, pin, center.x - 26, center.y + 28, 0.62);
+    ctx.strokeStyle = '#aaa9a3';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    const lookX = Math.max(-11, Math.min(11, center.vx * 1.4));
+    const lookY = Math.max(-9, Math.min(9, center.vy * 0.65));
+    const bulbLook = bulbScene.active && bulbScene.timer > 110 && bulbScene.timer < 295 ? -4.5 : 0;
+    const emotionLook = currentEmotion === 1 ? -2.5 : currentEmotion === 2 ? 3.5 : 0;
+    const eyeY = lookY + bulbLook + emotionLook - 4;
+    ctx.save();
+    ctx.translate(center.x, center.y);
+    ctx.scale(0.93, 0.93);
+    drawEyes(ctx, lookX, eyeY, {
+      joy: currentEmotion === 1 ? 1 : 0,
+      blink: frame % 170 > 162 && currentEmotion !== 3,
+      held: currentEmotion === 3
+    });
+    drawClothes(ctx, clothes, lookX, eyeY);
+    ctx.restore();
   }
 
   function pointerPosition(event) {
@@ -858,9 +815,9 @@ export function createActivities(canvas, onCatchWin, equipped) {
       const tick = 1 / 60;
       while (elapsed >= tick && isAnySceneActive()) {
         update();
-        paint();
         elapsed -= tick;
       }
+      paint();
       return isAnySceneActive();
     },
     stop,
