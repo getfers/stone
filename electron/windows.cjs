@@ -21,7 +21,7 @@ function positionFloatingWindow(entry, display) {
   if (entry.mode === 'widget') positionWidget(entry.window, display.workArea);
 }
 
-function createWindowManager(settings, { quit, refreshMenu, petSnapshot, openOrganizer, setAutostart, canAutostart, canHide }) {
+function createWindowManager(settings, { quit, refreshMenu, petSnapshot, openOrganizer, openSettings, setAutostart, canAutostart, canHide }) {
   let current;
   let pending;
 
@@ -63,13 +63,23 @@ function createWindowManager(settings, { quit, refreshMenu, petSnapshot, openOrg
       webPreferences: { backgroundThrottling: mode !== 'overlay' }
     });
 
-    const entry = { window, mode, displayId: display.id };
+    const entry = { window, mode, displayId: display.id, visible: false };
     pending = entry;
     if (mode === 'widget') positionWidget(window, display.workArea);
     if (mode === 'overlay') {
       window.setAlwaysOnTop(true, 'pop-up-menu');
       entry.overlay = watchOverlay(window);
     }
+    function syncVisibility() {
+      if (current !== entry) return;
+      const visible = window.isVisible() && !window.isMinimized();
+      if (entry.visible === visible) return;
+      entry.visible = visible;
+      entry.overlay?.setVisible(visible);
+      if (visible) window.webContents.send('stone:pet-state', petSnapshot());
+      window.webContents.send('stone:pet-visibility', visible);
+    }
+    for (const event of ['show', 'hide', 'minimize', 'restore']) window.on(event, syncVisibility);
     window.on('close', event => {
       if (current === entry && canHide()) {
         event.preventDefault();
@@ -95,10 +105,11 @@ function createWindowManager(settings, { quit, refreshMenu, petSnapshot, openOrg
       const previous = current;
       current = entry;
       pending = null;
+      window.webContents.send('stone:roaming-changed', settings.roaming);
+      window.webContents.send('stone:preferences-changed', settings.presentation());
       if (mode === 'overlay') window.showInactive();
       else window.show();
-      window.webContents.send('stone:roaming-changed', settings.roaming);
-      window.webContents.send('stone:pet-state', petSnapshot());
+      syncVisibility();
       previous?.window.destroy();
       refreshMenu();
     }
@@ -152,6 +163,7 @@ function createWindowManager(settings, { quit, refreshMenu, petSnapshot, openOrg
         } },
       { label: 'Заметки', click: () => openOrganizer('notes') },
       { label: 'Будильники', click: () => openOrganizer('alarms') },
+      { label: 'Настройки', click: openSettings },
       { type: 'separator' },
       { label: 'Самостоятельное движение', type: 'checkbox', checked: settings.roaming, click: item => {
         try {
@@ -182,7 +194,7 @@ function createWindowManager(settings, { quit, refreshMenu, petSnapshot, openOrg
       return current;
     },
     publishPet(state) {
-      current?.window.webContents.send('stone:pet-state', state);
+      if (current?.visible) current.window.webContents.send('stone:pet-state', state);
     },
     fromSender(sender) {
       if (current?.window.webContents === sender) return current;

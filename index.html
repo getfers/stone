@@ -10,13 +10,15 @@
 </head>
 <body>
   <header class="app-header" data-view="welcome full widget" hidden>
-    <div class="brand"><img src="assets/stone.png" alt="" width="32" height="32"> Камешек</div>
+    <div class="brand"><img src="assets/stone.png" alt="" width="32" height="32"><span>Камешек</span></div>
     <div class="header-actions">
       <button class="text-button" type="button" data-organizer="notes">
         <span class="notebook-icon" aria-hidden="true"></span><span>Органайзер</span>
       </button>
       <button class="text-button" id="open-panel" type="button" data-view="widget" aria-controls="pet-panel" aria-expanded="false" hidden>Уход</button>
-    <button class="text-button" id="mode-menu" type="button" data-view="full widget" hidden>Режимы <span aria-hidden="true">⌄</span></button></div>
+      <button class="text-button" id="mode-menu" type="button">Режимы <span aria-hidden="true">⌄</span></button>
+      <button class="text-button" id="open-settings" type="button">Настройки</button>
+    </div>
   </header>
 
   <main class="workspace">

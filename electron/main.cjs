@@ -1,10 +1,11 @@
 const path = require('node:path');
-const { app, ipcMain, nativeTheme, powerMonitor, Tray } = require('electron');
-const { loadSettings } = require('./settings.cjs');
+const { app, BrowserWindow, ipcMain, nativeTheme, powerMonitor, Tray } = require('electron');
+const { loadSettings, validatePreference } = require('./settings.cjs');
 const { createPetState } = require('./pet-state.cjs');
 const { createWindowManager } = require('./windows.cjs');
 const { createOrganizer } = require('./organizer.cjs');
 const { createOrganizerWindows } = require('./organizer-windows.cjs');
+const { createAppWindow, root } = require('./app-window.cjs');
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -26,6 +27,7 @@ function start() {
   // The installed process of a portable build runs under a temporary directory.
   const login = { path: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath, args: ['--autostart'] };
   let quitting = false;
+  let settingsWindow;
 
   const extra = createOrganizerWindows(() => windows.publishPet(pet.command('alert')));
   const windows = createWindowManager(settings, {
@@ -33,6 +35,7 @@ function start() {
     refreshMenu,
     petSnapshot: () => pet.snapshot(),
     openOrganizer: extra.open,
+    openSettings,
     setAutostart,
     canAutostart,
     canHide: () => !quitting && !tray.isDestroyed()
@@ -40,6 +43,33 @@ function start() {
 
   function refreshMenu() {
     if (!tray.isDestroyed()) tray.setContextMenu(windows.menu());
+  }
+
+  function publishPreferences() {
+    const publicSettings = settings.presentation();
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send('stone:preferences-changed', publicSettings);
+    }
+    return publicSettings;
+  }
+
+  function openSettings() {
+    if (settingsWindow) {
+      if (settingsWindow.isMinimized()) settingsWindow.restore();
+      settingsWindow.show();
+      return;
+    }
+    const window = createAppWindow({
+      title: 'Камешек · Настройки', width: 626, height: 565,
+      minWidth: 480, minHeight: 470
+    });
+    settingsWindow = window;
+    window.once('closed', () => { settingsWindow = null; });
+    window.once('ready-to-show', () => window.show());
+    window.loadFile(path.join(root, 'settings.html')).catch(error => {
+      console.warn('Could not open settings:', error.message);
+      if (!window.isDestroyed()) window.destroy();
+    });
   }
 
   function setAutostart(enabled) {
@@ -57,6 +87,7 @@ function start() {
       throw error;
     }
     refreshMenu();
+    publishPreferences();
   }
 
   function checkSchedule() {
@@ -66,7 +97,7 @@ function start() {
       console.warn('Could not update schedule:', error.message);
     }
     const alert = organizer.current();
-    extra.showAlert(alert && { ...alert, equipped: pet.snapshot().equipped });
+    extra.showAlert(alert && { ...alert, equipped: pet.snapshot().equipped, volume: settings.volume });
   }
 
   ipcMain.on('stone:mode', (event, mode) => {
@@ -83,7 +114,8 @@ function start() {
     return windows.setRoaming(value);
   });
   ipcMain.on('stone:hit-area', (event, area) => {
-    windows.fromSender(event.sender)?.overlay?.setHitArea(area);
+    const entry = windows.fromSender(event.sender);
+    if (entry?.visible) entry.overlay?.setHitArea(area);
   });
   ipcMain.on('stone:pointer-held', (event, held) => {
     windows.fromSender(event.sender)?.overlay?.setPointerHeld(held);
@@ -109,6 +141,29 @@ function start() {
 
   ipcMain.on('stone:open-organizer', (event, tab) => {
     if (windows.fromSender(event.sender) && ['notes', 'alarms'].includes(tab)) extra.open(tab);
+  });
+  ipcMain.on('stone:open-settings', event => {
+    if (windows.fromSender(event.sender)) openSettings();
+  });
+  ipcMain.handle('stone:preferences', event => {
+    if (settingsWindow?.webContents !== event.sender && !windows.fromSender(event.sender) &&
+        !extra.isEditor(event.sender) && !extra.isAlert(event.sender)) {
+      throw new Error('Invalid preferences window');
+    }
+    return { ...settings.presentation(), canAutostart };
+  });
+  ipcMain.handle('stone:update-preference', (event, key, value) => {
+    if (settingsWindow?.webContents !== event.sender || typeof key !== 'string') {
+      throw new Error('Invalid settings window');
+    }
+    validatePreference(key, value);
+    if (key === 'autostart') {
+      if (!canAutostart) throw new Error('Windows startup is unavailable');
+      setAutostart(value);
+      return settings.presentation();
+    }
+    settings.update({ [key]: value });
+    return publishPreferences();
   });
   ipcMain.handle('stone:organizer', event => {
     if (!extra.isEditor(event.sender)) throw new Error('Invalid organizer window');
@@ -144,7 +199,7 @@ function start() {
   const tick = setInterval(() => {
     checkSchedule();
     const entry = windows.current;
-    const active = Boolean(entry && entry.mode !== 'welcome' && entry.window.isVisible());
+    const active = Boolean(entry?.visible && entry.mode !== 'welcome');
     windows.publishPet(pet.tick({
       busy: (active && entry.busy) || organizer.current()?.kind === 'alarm',
       roaming: settings.roaming,
@@ -165,9 +220,11 @@ function start() {
     clearInterval(tick);
     powerMonitor.off('resume', checkSchedule);
     pet.save();
+    settingsWindow?.destroy();
     extra.close();
     tray.destroy();
   });
 
-  if (!process.argv.includes('--autostart')) restore();
+  const startMode = settings.startupWindow(process.argv.includes('--autostart'));
+  if (startMode) windows.show(startMode);
 }

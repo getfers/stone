@@ -1,4 +1,4 @@
-import { alarmAudio, sounds, weekdays, weekdayOrder } from './organizer-catalog.mjs';
+import { alarmAudio, alarmVolume, sounds, weekdays, weekdayOrder } from './organizer-catalog.mjs';
 
 const api = window.stone;
 const $ = id => document.getElementById(id);
@@ -28,6 +28,7 @@ let section = 'notes';
 let state = { notes: [], alarms: [] };
 let selected;
 let preview;
+let volume = 100;
 let busy = false;
 let dirty = false;
 
@@ -219,7 +220,7 @@ $('preview-sound').addEventListener('click', () => {
     stopPreview();
     return;
   }
-  const audio = alarmAudio(alarmSound.value);
+  const audio = alarmAudio(alarmSound.value, volume);
   preview = audio;
   $('preview-sound').textContent = 'Остановить';
   audio.addEventListener('ended', stopPreview, { once: true });
@@ -229,6 +230,14 @@ $('preview-sound').addEventListener('click', () => {
     status.textContent = 'Не удалось воспроизвести сигнал.';
   });
 });
+
+function applyVolume(settings) {
+  volume = settings.volume;
+  if (preview) preview.volume = alarmVolume(volume);
+}
+
+api.onPreferences(applyVolume);
+api.preferences().then(applyVolume).catch(() => {});
 
 api.onOrganizerState(next => {
   state = next;

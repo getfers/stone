@@ -17,12 +17,13 @@ export class Pet {
     this.previousPhase = 'day';
     this.phaseBlend = 1;
     this.equipped = {};
+    this.size = 1;
   }
 
   resize(width, height) {
     const previous = this.bounds;
     const maxSize = { welcome: 1.9, widget: 0.95, full: 1.78, overlay: 0.93 }[this.mode];
-    this.scale = Math.min(maxSize, width / 190, height / 132);
+    this.scale = Math.min(maxSize, width / 215, height / 230) * this.size;
     this.bounds = { width, height };
 
     if (previous) {
@@ -37,9 +38,9 @@ export class Pet {
 
   place(x, y) {
     const { width, height } = this.bounds;
-    const side = Math.min(84 * this.scale, width / 2);
-    const top = Math.min(92 * this.scale, height / 2);
-    const bottom = Math.min(48 * this.scale, height / 2);
+    const side = Math.min(88 * this.scale, width / 2);
+    const top = Math.min(106 * this.scale, height / 2);
+    const bottom = Math.min(84 * this.scale, height / 2);
     this.x = clamp(x, side, width - side);
     this.y = clamp(y, top, height - bottom);
   }
@@ -47,6 +48,13 @@ export class Pet {
   setRoaming(value) {
     this.roaming = value;
     this.target = null;
+  }
+
+  setSize(size) {
+    const scale = { small: 0.78, medium: 1, large: 1.22 }[size];
+    if (scale === this.size) return;
+    this.size = scale;
+    if (this.bounds) this.resize(this.bounds.width, this.bounds.height);
   }
 
   update(state) {

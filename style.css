@@ -231,7 +231,8 @@ body[data-mode="welcome"] .stage {
 .text-button:hover { background: #2c2b29; }
 
 .header-actions { display: flex; align-items: center; gap: 7px; }
-body[data-mode="full"] .workspace { gap: clamp(14px, 2.3vw, 26px); }
+body[data-mode="full"] { height: 100vh; }
+body[data-mode="full"] .workspace { min-height: 0; gap: clamp(14px, 2.3vw, 26px); }
 body[data-mode="full"] .stage { flex: 1; min-width: 0; min-height: 300px; }
 .stage-heading, .stage-status {
   position: absolute;
@@ -314,6 +315,8 @@ meter::-webkit-meter-even-less-good-value { background: #cd8a7d; }
   margin-block: 12px;
 }
 .wardrobe { margin-top: 0; }
+.wardrobe .icon-button { min-height: 44px; padding-block: 4px; }
+.wardrobe .icon-button[aria-pressed="true"] { border-color: #9b8a6a; background: #353128; }
 .icon-button {
   display: flex;
   align-items: center;
@@ -405,10 +408,14 @@ meter::-webkit-meter-even-less-good-value { background: #cd8a7d; }
   font-size: 19px;
 }
 
-body[data-mode="widget"] .app-header { min-height: 44px; padding: 0 10px; }
-body[data-mode="widget"] .brand { font-size: 13px; gap: 5px; }
+body[data-mode="widget"] { height: 100vh; }
+body[data-mode="widget"] .app-header { min-height: 44px; padding: 0 8px; gap: 6px; }
+body[data-mode="widget"] .app-header .header-actions { gap: 4px; }
+body[data-mode="widget"] .app-header .text-button { padding-inline: 6px; font-size: 11px; }
+body[data-mode="widget"] .app-header .notebook-icon { display: none; }
+body[data-mode="widget"] .brand span { position: absolute; clip-path: inset(50%); }
 body[data-mode="widget"] .brand img { width: 24px; height: 24px; }
-body[data-mode="widget"] .workspace { position: relative; padding: 8px; }
+body[data-mode="widget"] .workspace { position: relative; min-height: 0; padding: 8px; }
 body[data-mode="widget"] .stage { flex: 1; border-radius: 13px; min-height: 105px; }
 body[data-mode="widget"] .stage-heading { top: 8px; left: 8px; }
 body[data-mode="widget"] .pet-panel { position: absolute; inset: 8px; width: auto; padding: 9px; gap: 5px; max-height: none; }
@@ -631,6 +638,67 @@ textarea:focus-visible, .alert-bubble p:focus-visible {
 @media (min-width: 820px) {
   .organizer-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); }
 }
+
+.settings-page { width: min(100%, 660px); margin: 0 auto; padding: 24px clamp(22px, 5vw, 36px); }
+.settings-page h1 { margin: 0 0 20px; font-size: 30px; letter-spacing: -.035em; }
+.settings-card {
+  min-width: 0;
+  margin: 0 0 16px;
+  padding: 2px 16px 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #1a1a1a;
+}
+.settings-card legend { padding-inline: 6px; color: var(--accent); font-size: 12px; font-weight: 650; }
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 43%);
+  align-items: center;
+  min-height: 49px;
+  gap: 6px 14px;
+  padding-block: 9px;
+  font-size: 13px;
+}
+.settings-row + .settings-row { border-top: 1px solid #30302d; }
+.settings-row select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #45433e;
+  border-radius: 7px;
+  background: #252524;
+  font: inherit;
+  color: #efede6;
+}
+.settings-row small { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+.settings-slider { display: grid; grid-template-columns: minmax(0, 1fr) 43px; align-items: center; gap: 8px; }
+.settings-slider input { width: 100%; margin: 0; accent-color: var(--accent); }
+.settings-slider output { color: var(--accent); text-align: right; font-variant-numeric: tabular-nums; }
+.settings-row [role="switch"] {
+  appearance: none;
+  position: relative;
+  justify-self: end;
+  width: 35px;
+  height: 21px;
+  margin: 0;
+  border: 1px solid #68665f;
+  border-radius: 12px;
+  background: #373734;
+  cursor: pointer;
+}
+.settings-row [role="switch"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #b1b0a8;
+}
+.settings-row [role="switch"]:checked { background: #524937; border-color: #8a7d5f; }
+.settings-row [role="switch"]:checked::after { left: 17px; background: var(--accent); }
+.settings-row [role="switch"]:disabled { opacity: .56; cursor: default; }
+.settings-status { margin: 0; color: #edaa9e; font-size: 12px; }
 
 html:has(> .alert-view) { background: transparent; }
 .alert-view { min-height: 100vh; justify-content: end; overflow: hidden; }

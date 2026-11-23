@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>Камешек · Настройки</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="renderer/settings.mjs"></script>
+</head>
+<body class="settings-view">
+  <main class="settings-page">
+    <h1>Настройки</h1>
+    <fieldset class="settings-card" id="appearance" disabled>
+      <legend>Изображение и звук</legend>
+      <div class="settings-row">
+        <label for="fps">Частота кадров</label>
+        <select id="fps" data-preference="fps">
+          <option value="20">Эконом 20</option>
+          <option value="30">Стандарт 30</option>
+          <option value="60">Плавный 60</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <label for="brightness">Яркость сцены</label>
+        <div class="settings-slider">
+          <input id="brightness" type="range" min="40" max="100" data-preference="brightness">
+          <output for="brightness"></output>
+        </div>
+      </div>
+      <div class="settings-row">
+        <label for="size">Размер камешка</label>
+        <select id="size" data-preference="size">
+          <option value="small">Маленький</option>
+          <option value="medium">Средний</option>
+          <option value="large">Большой</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <label for="volume">Громкость звуков</label>
+        <div class="settings-slider">
+          <input id="volume" type="range" min="0" max="100" data-preference="volume">
+          <output for="volume"></output>
+        </div>
+      </div>
+    </fieldset>
+    <fieldset class="settings-card" id="startup" disabled>
+      <legend>Запуск приложения</legend>
+      <div class="settings-row">
+        <label for="autostart">Автозапуск с Windows</label>
+        <input id="autostart" type="checkbox" role="switch" data-preference="autostart" aria-describedby="autostart-hint">
+        <small id="autostart-hint" hidden>Доступно в portable-сборке Windows.</small>
+      </div>
+      <div class="settings-row">
+        <label for="startupMode">Режим окна при старте</label>
+        <select id="startupMode" data-preference="startupMode" aria-describedby="startup-hint">
+          <option value="default">По умолчанию</option>
+          <option value="last">Последний режим</option>
+          <option value="welcome">Главное меню</option>
+          <option value="overlay">Оверлей</option>
+          <option value="widget">Мини-виджет</option>
+          <option value="full">Полное окно</option>
+          <option value="tray">В трее</option>
+        </select>
+        <small id="startup-hint">При обычном запуске откроется последний режим, при входе в Windows камешек останется в трее.</small>
+      </div>
+    </fieldset>
+    <p id="preferences-status" role="status" class="settings-status"></p>
+  </main>
+</body>
+</html>
