@@ -4,61 +4,61 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'">
-  <title>Камешек · Органайзер</title>
+  <title data-i18n="Камешек · Органайзер">Камешек · Органайзер</title>
   <link rel="stylesheet" href="style.css">
   <script type="module" src="renderer/organizer.mjs"></script>
 </head>
 <body class="organizer">
   <header class="app-header">
-    <div class="brand"><img src="assets/stone.png" alt="" width="32" height="32"> Камешек</div>
-    <nav class="organizer-nav" aria-label="Разделы органайзера">
-      <button type="button" data-section="notes" aria-pressed="true">Заметки</button>
-      <button type="button" data-section="alarms" aria-pressed="false">Будильники</button>
+    <div class="brand"><img src="assets/stone.png" alt="" width="32" height="32"> <span data-i18n="Камешек">Камешек</span></div>
+    <nav class="organizer-nav" aria-label="Разделы органайзера" data-i18n-aria-label="Разделы органайзера">
+      <button type="button" data-section="notes" aria-pressed="true" data-i18n="Заметки">Заметки</button>
+      <button type="button" data-section="alarms" aria-pressed="false" data-i18n="Будильники">Будильники</button>
     </nav>
   </header>
   <main class="organizer-layout">
     <section class="organizer-records" aria-labelledby="organizer-title">
-      <h1 id="organizer-title">Заметки</h1>
+      <h1 id="organizer-title" data-i18n="Заметки">Заметки</h1>
       <p id="organizer-subtitle"></p>
       <ul id="organizer-list" class="organizer-list"></ul>
       <p id="organizer-empty" class="empty-state" hidden></p>
     </section>
     <section class="organizer-editor" aria-labelledby="editor-title">
       <div class="editor-heading">
-        <h2 id="editor-title">Новая заметка</h2>
-        <button id="new-entry" class="text-button" type="button" hidden>Добавить</button>
+        <h2 id="editor-title" data-i18n="Новая заметка">Новая заметка</h2>
+        <button id="new-entry" class="text-button" type="button" hidden data-i18n="Добавить">Добавить</button>
       </div>
-      <form id="note-form">
-        <label>Текст заметки
-          <textarea id="note-text" rows="4" maxlength="600" placeholder="Что нужно запомнить?" required></textarea>
+      <form id="note-form" novalidate>
+        <label><span data-i18n="Текст заметки">Текст заметки</span>
+          <textarea id="note-text" rows="4" maxlength="600" placeholder="Что нужно запомнить?" data-i18n-placeholder="Что нужно запомнить?" required></textarea>
         </label>
-        <label>Напомнить
+        <label><span data-i18n="Напомнить">Напомнить</span>
           <input id="note-at" type="datetime-local" aria-describedby="note-hint">
-          <small id="note-hint">Пустое поле оставит запись обычной заметкой.</small>
+          <small id="note-hint" data-i18n="Пустое поле оставит запись обычной заметкой.">Пустое поле оставит запись обычной заметкой.</small>
         </label>
         <div class="editor-actions">
-          <button class="primary-button" type="submit">Сохранить заметку</button>
-          <button class="text-button editor-delete" type="button" hidden>Удалить</button>
+          <button class="primary-button" type="submit" data-i18n="Сохранить заметку">Сохранить заметку</button>
+          <button class="text-button editor-delete" type="button" hidden data-i18n="Удалить">Удалить</button>
         </div>
       </form>
-      <form id="alarm-form" hidden>
+      <form id="alarm-form" novalidate hidden>
         <div class="alarm-fields">
-          <label>Время<input id="alarm-time" type="time" value="07:00" required></label>
-          <label>Подпись<input id="alarm-label" type="text" maxlength="100" placeholder="Например, утренняя зарядка"></label>
+          <label><span data-i18n="Время">Время</span><input id="alarm-time" type="time" value="07:00" required></label>
+          <label><span data-i18n="Подпись">Подпись</span><input id="alarm-label" type="text" maxlength="100" placeholder="Например, утренняя зарядка" data-i18n-placeholder="Например, утренняя зарядка"></label>
         </div>
         <fieldset>
-          <legend>Дни недели</legend>
+          <legend data-i18n="Дни недели">Дни недели</legend>
           <div class="day-pills" id="alarm-days"></div>
-          <small>Без выбранных дней прозвонит один раз.</small>
+          <small data-i18n="Без выбранных дней прозвонит один раз.">Без выбранных дней прозвонит один раз.</small>
         </fieldset>
         <div class="sound-picker">
-          <label>Сигнал<select id="alarm-sound"></select></label>
-          <button class="text-button" type="button" id="preview-sound">Прослушать</button>
+          <label><span data-i18n="Сигнал">Сигнал</span><select id="alarm-sound"></select></label>
+          <button class="text-button" type="button" id="preview-sound" data-i18n="Прослушать">Прослушать</button>
         </div>
-        <label class="check-label"><input id="alarm-enabled" type="checkbox" checked> Включён</label>
+        <label class="check-label"><input id="alarm-enabled" type="checkbox" checked> <span data-i18n="Включён">Включён</span></label>
         <div class="editor-actions">
-          <button class="primary-button" type="submit">Сохранить будильник</button>
-          <button class="text-button editor-delete" type="button" hidden>Удалить</button>
+          <button class="primary-button" type="submit" data-i18n="Сохранить будильник">Сохранить будильник</button>
+          <button class="text-button editor-delete" type="button" hidden data-i18n="Удалить">Удалить</button>
         </div>
       </form>
       <p id="editor-status" role="status"></p>
@@ -66,8 +66,17 @@
         <form method="dialog">
           <h2 id="delete-title"></h2>
           <div class="editor-actions">
-            <button class="text-button" value="cancel" autofocus>Отмена</button>
-            <button class="primary-button" value="delete">Удалить</button>
+            <button class="text-button" value="cancel" autofocus data-i18n="Отмена">Отмена</button>
+            <button class="primary-button" value="delete" data-i18n="Удалить">Удалить</button>
+          </div>
+        </form>
+      </dialog>
+      <dialog id="discard-dialog" aria-labelledby="discard-title">
+        <form method="dialog">
+          <h2 id="discard-title"></h2>
+          <div class="editor-actions">
+            <button class="text-button" value="cancel" autofocus data-i18n="Отмена">Отмена</button>
+            <button class="primary-button" value="discard" data-i18n="Продолжить">Продолжить</button>
           </div>
         </form>
       </dialog>

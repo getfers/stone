@@ -1,10 +1,14 @@
+import { arcade, startArcade } from './arcade.mjs';
 import { activities, createActivities } from './activities.mjs';
 import { createSprite } from './animation.mjs';
 import { landscape, paintIcon } from './art.mjs';
 import { care, clothes, needs, periods, rooms, trips } from './catalog.mjs';
 import { createFrameLoop } from './frame-loop.mjs';
 import { games, startGame } from './games.mjs';
+import { onLanguage, setLanguage, setMessage, t } from './localization.mjs';
 import { Pet } from './pet.mjs';
+import { createWalk } from './walk.mjs';
+import { walks } from './walk-catalog.mjs';
 
 const params = new URLSearchParams(location.search);
 const mode = params.get('mode') ?? 'welcome';
@@ -36,6 +40,7 @@ const settingsError = select('#settings-error');
 const landscapeCanvas = select('#landscape');
 const scenery = mode === 'overlay' ? null : landscapeCanvas.getContext('2d');
 const panel = select('#pet-panel');
+const panelContent = select('.panel-content');
 let state;
 let lastPose;
 let lastHitTime = -Infinity;
@@ -43,6 +48,7 @@ let lastHitArea = '';
 let fps = 30;
 let volume = 1;
 let activeSound;
+let sceneSize = 'medium';
 
 roaming.checked = pet.roaming;
 api.onRoamingChanged(value => {
@@ -51,12 +57,12 @@ api.onRoamingChanged(value => {
 });
 roaming.addEventListener('change', async () => {
   roaming.disabled = true;
-  settingsError.textContent = '';
+  setMessage(settingsError, '');
   try {
     roaming.checked = await api.setRoaming(roaming.checked);
   } catch {
     roaming.checked = pet.roaming;
-    settingsError.textContent = 'Не удалось сохранить настройку';
+    setMessage(settingsError, 'Не удалось сохранить настройку.');
   } finally {
     roaming.disabled = false;
   }
@@ -133,10 +139,12 @@ function iconButton(id, name, description) {
   icon.setAttribute('aria-hidden', 'true');
   paintIcon(icon, id);
   const text = document.createElement('span');
-  text.textContent = name;
+  const label = document.createElement('span');
+  setMessage(label, name);
+  text.append(label);
   if (description) {
     const detail = document.createElement('small');
-    detail.textContent = description;
+    setMessage(detail, description);
     text.append(detail);
   }
   button.append(icon, text);
@@ -146,11 +154,15 @@ function iconButton(id, name, description) {
 const meters = Object.entries(needs).map(([id, label]) => {
   const wrapper = document.createElement('label');
   wrapper.className = 'meter-label';
-  wrapper.textContent = label;
+  const name = document.createElement('span');
+  name.className = 'meter-name';
+  setMessage(name, label);
+  wrapper.append(name);
   const score = document.createElement('span');
   score.setAttribute('aria-hidden', 'true');
   const meter = document.createElement('meter');
-  meter.setAttribute('aria-label', label);
+  meter.dataset.i18nAriaLabel = label;
+  meter.setAttribute('aria-label', t(label));
   meter.max = 100;
   meter.low = 35;
   meter.high = 60;
@@ -186,7 +198,7 @@ sleepButton.addEventListener('click', () => {
 });
 
 const wardrobe = Object.entries(clothes).map(([id, item]) => {
-  const button = iconButton(id, item.name, item.from ? trips[item.from].name : '');
+  const button = iconButton(id, item.name, item.from ? walks[item.from].name : '');
   button.dataset.item = id;
   button.addEventListener('click', () => api.petCommand('equip', id));
   select('#wardrobe').append(button);
@@ -195,7 +207,11 @@ const wardrobe = Object.entries(clothes).map(([id, item]) => {
 
 function setupSelect(id, options) {
   const input = select('#' + id);
-  for (const [value, label] of Object.entries(options)) input.add(new Option(label, value));
+  for (const [value, label] of Object.entries(options)) {
+    const option = new Option(t(label), value);
+    option.dataset.i18n = label;
+    input.add(option);
+  }
   input.addEventListener('change', () => api.petCommand(id, input.value));
   return input;
 }
@@ -203,19 +219,23 @@ const room = setupSelect('room', rooms);
 const clock = setupSelect('clock', { auto: 'По системному времени', ...periods });
 select('#room-field').hidden = mode === 'overlay';
 
-const tripButtons = Object.entries(trips).map(([id, destination]) => {
-  const button = makeButton(destination.name, 'trip-option');
+const walkOptions = select('#trip-options');
+for (const [id, destination] of Object.entries(walks)) {
+  const button = makeButton('', 'trip-option');
+  const label = document.createElement('span');
+  setMessage(label, destination.name);
   const detail = document.createElement('small');
-  detail.textContent = destination.duration + ' с · ' + clothes[destination.item].name;
-  button.append(detail);
+  setMessage(detail, destination.description);
+  button.append(label, detail);
   button.dataset.trip = id;
-  button.addEventListener('click', () => {
-    api.petCommand('trip', id);
-    if (mode !== 'full') hidePanel();
-  });
-  select('#trip-options').append(button);
-  return button;
-});
+  button.addEventListener('click', () => api.petCommand('explore', id));
+  walkOptions.append(button);
+}
+const walkPlayer = select('#walk-player');
+const walkStage = select('#walk-stage');
+const walkScene = select('#walk-scene');
+if (mode === 'full') walkStage.append(walkScene);
+const walk = createWalk(walkScene, walkPlayer, api, () => pet.equipped, () => sceneSize);
 const returnHome = select('#return-home');
 returnHome.addEventListener('click', () => api.petCommand('return'));
 
@@ -225,10 +245,13 @@ const tabs = [...document.querySelectorAll('[data-tab]')];
 const pages = [...document.querySelectorAll('[data-panel]')];
 const activityCanvas = select('#activity-scene');
 const activityStatus = select('#activity-status');
+const activityName = select('#activity-name');
 const stopButton = select('#stop-activity');
 const gamePlayer = select('#game-player');
 const gameOptions = select('#game-options');
 const gameBoard = select('#game-board');
+const gameStage = select('#game-stage');
+let arcadeRunning = false;
 let theater;
 let gameSession;
 let activeButton;
@@ -240,11 +263,14 @@ function selectTab(id) {
   currentTab = id;
   for (const tab of tabs) tab.setAttribute('aria-pressed', String(tab.dataset.tab === id));
   for (const page of pages) page.hidden = page.dataset.panel !== id;
+  panelContent.scrollTop = 0;
+  syncWalkStage();
 }
 
 function showPanel() {
   if (mode === 'welcome' || !state) return;
   panel.hidden = false;
+  syncWalkStage();
   openButton.setAttribute('aria-expanded', 'true');
   if (mode === 'overlay') {
     panel.dataset.side = pet.bounds && pet.x > pet.bounds.width / 2 ? 'left' : 'right';
@@ -258,6 +284,7 @@ function hidePanel() {
   if (panel.hidden || mode === 'full') return;
   finishActivity(false);
   panel.hidden = true;
+  syncWalkStage();
   openButton.setAttribute('aria-expanded', 'false');
   publishHitArea();
   if (mode === 'overlay') api.setPanelOpen(false);
@@ -269,7 +296,7 @@ openButton.addEventListener('click', () => panel.hidden ? showPanel() : hidePane
 closeButton.addEventListener('click', hidePanel);
 api.onOpenPanel(showPanel);
 if (mode === 'full') {
-  select('#panel-title').textContent = 'Уход и занятия';
+  setMessage(select('#panel-title'), 'Уход и занятия');
   panel.hidden = false;
 }
 
@@ -278,20 +305,34 @@ function finishActivity(focus = true) {
   gameSession?.stop();
   gameSession = null;
   if (theaterRunning) theater.stop();
-  theaterRunning = false;
+  theaterRunning = arcadeRunning = false;
   api.setActivity(false);
   gamePlayer.hidden = true;
   gameOptions.hidden = false;
   gameBoard.replaceChildren();
+  gameStage.hidden = true;
+  gamePlayer.append(gameBoard);
+  syncWalkStage();
   if (focus) activeButton.focus();
   activeButton = null;
 }
 
-function addActivity({ id, name, description }, interactive) {
-  const button = makeButton(name, 'game-option');
+function activityFinished(reward) {
+  api.petCommand('game', reward);
+  api.setActivity(false);
+  setMessage(stopButton, 'К играм');
+  stopButton.focus();
+}
+
+function addActivity(activity, type) {
+  const { id, name, description, compactHint } = activity;
+  const button = makeButton('', 'game-option');
+  const label = document.createElement('span');
+  setMessage(label, name);
+  button.append(label);
   if (description) {
     const detail = document.createElement('small');
-    detail.textContent = description;
+    setMessage(detail, description);
     button.append(detail);
   }
   button.dataset.game = id;
@@ -300,16 +341,22 @@ function addActivity({ id, name, description }, interactive) {
     api.setActivity(true);
     gameOptions.hidden = true;
     gamePlayer.hidden = false;
-    activityStatus.textContent = description ?? name;
-    activityCanvas.hidden = interactive;
-    stopButton.textContent = 'Закончить';
-    if (interactive) {
-      gameSession = startGame(id, gameBoard, reward => {
-        api.petCommand('game', reward);
-        api.setActivity(false);
-        stopButton.textContent = 'К играм';
-        stopButton.focus();
-      });
+    panelContent.scrollTop = 0;
+    setMessage(activityStatus, (mode === 'widget' && compactHint) || description || name);
+    setMessage(activityName, name);
+    activityName.hidden = type !== 'arcade';
+    activityCanvas.hidden = type !== 'theater';
+    setMessage(stopButton, 'Закончить');
+    if (type === 'arcade') {
+      arcadeRunning = true;
+      if (mode === 'full') {
+        gameStage.append(gameBoard);
+        gameStage.hidden = false;
+      }
+      syncWalkStage();
+      gameSession = startArcade(id, gameBoard, () => pet.equipped, () => sceneSize, activityFinished);
+    } else if (type === 'classic') {
+      gameSession = startGame(id, gameBoard, activityFinished);
     } else {
       theaterRunning = true;
       theater ??= createActivities(activityCanvas, () => api.petCommand('game', 20), () => pet.equipped);
@@ -320,9 +367,10 @@ function addActivity({ id, name, description }, interactive) {
   gameOptions.append(button);
 }
 
-for (const game of games) addActivity(game, true);
+for (const game of arcade) addActivity(game, 'arcade');
+for (const game of games) addActivity(game, 'classic');
 for (const activity of activities) {
-  addActivity({ id: activity.id, name: activity.label, description: activity.hint }, false);
+  addActivity({ id: activity.id, name: activity.label, description: activity.hint }, 'theater');
 }
 stopButton.addEventListener('click', () => finishActivity());
 window.addEventListener('keydown', event => {
@@ -333,12 +381,55 @@ window.addEventListener('keydown', event => {
 
 const stageStatus = select('#stage-status');
 const deviceStatus = select('#device-status');
-const tripStatus = select('#trip-status');
+const tripStatus = select('#legacy-trip-status');
 const placeName = select('#place-name');
 const timeName = select('#time-name');
 
+function syncWalkStage() {
+  const visible = Boolean(state?.exploration && currentTab === 'walk' && !panel.hidden);
+  walkStage.hidden = mode !== 'full' || !visible;
+  if (mode === 'full') select('#home-footer-hint').hidden = visible || arcadeRunning;
+  const label = visible ? walks[state.exploration.id].name
+    : arcadeRunning ? activityName.dataset.i18n : 'Площадка камешка';
+  stage.dataset.i18nAriaLabel = label;
+  stage.setAttribute('aria-label', t(label));
+  stage.classList.toggle('side-scene', mode === 'overlay' && (visible || arcadeRunning));
+}
+
+function legacyLog(text) {
+  for (const trip of Object.values(trips)) {
+    for (const event of trip.events) {
+      if (text === event) return t(event);
+      if (text.startsWith(event + ' Находка в гардеробе')) {
+        return t(event) + ' ' + t('Находка в гардеробе — «{item}».', { item: t(clothes[trip.item].name) });
+      }
+    }
+  }
+  return text;
+}
+
+function renderState() {
+  if (!state) return;
+  const place = state.trip?.id ?? state.room;
+  const log = legacyLog(state.tripLog);
+  setText(placeName, t(state.trip ? trips[place].name : rooms[place]));
+  setText(timeName, t(periods[state.phase]));
+  const status = state.sleeping ? t('Камешек тихонько спит.')
+    : state.exploration ? t('Камешек на прогулке.')
+    : state.status === state.tripLog && log ? log
+    : state.status ? t(state.status) : log || t('Камешек дома.');
+  setText(stageStatus, status);
+  setText(deviceStatus, [t(periods[state.phase]), status].join(' · '));
+  const tripText = state.trip ? t('{place} · ещё {seconds} с', {
+    place: t(trips[place].name), seconds: Math.max(0, Math.ceil((state.trip.endsAt - state.updatedAt) / 1000))
+  }) : log;
+  setText(tripStatus, tripText);
+  setText(sleepButton, t(state.sleeping ? 'Разбудить' : 'Уложить спать'));
+}
+
 function update(next) {
   const wasReady = Boolean(state);
+  const changedWalk = state?.exploration?.token !== next.exploration?.token;
   state = next;
   pet.update(next);
   updateFps();
@@ -351,19 +442,14 @@ function update(next) {
       landscape(scenery, place);
     }
   }
-  setText(placeName, state.trip ? trips[place].name : rooms[place]);
-  setText(timeName, periods[state.phase]);
-  const status = state.sleeping ? 'Камешек тихонько спит.' : state.status || state.tripLog || 'Камешек дома.';
-  setText(stageStatus, status);
-  setText(deviceStatus, [periods[state.phase], status].filter(Boolean).join(' · '));
-  const tripText = state.trip
-    ? trips[place].name + ' · ещё ' + Math.max(0, Math.ceil((state.trip.endsAt - state.updatedAt) / 1000)) + ' с'
-    : state.tripLog;
-  setText(tripStatus, tripText);
-  returnHome.hidden = !state.trip;
-  for (const button of tripButtons) button.disabled = Boolean(state.trip);
-  sleepButton.disabled = Boolean(state.trip);
-  setText(sleepButton, state.sleeping ? 'Разбудить' : 'Уложить спать');
+  walkOptions.hidden = Boolean(state.trip || state.exploration);
+  walkPlayer.hidden = !state.exploration;
+  returnHome.hidden = !walkOptions.hidden;
+  sleepButton.disabled = walkOptions.hidden;
+  walk.update(state.exploration);
+  if (changedWalk && currentTab === 'walk') panelContent.scrollTop = 0;
+  syncWalkStage();
+  renderState();
   for (const { id, meter, score } of meters) {
     meter.value = Math.round(state.needs[id]);
     setText(score, String(meter.value));
@@ -379,9 +465,15 @@ function update(next) {
 }
 api.onPetState(update);
 
+onLanguage(() => {
+  renderState();
+  walk.render();
+  gameSession?.localize();
+});
+
 function publishHitArea() {
   if (mode !== 'overlay' || !state || !lastPose) return;
-  const area = sprite.hitArea(pet, lastPose);
+  const area = stage.classList.contains('side-scene') ? [] : sprite.hitArea(pet, lastPose);
   if (!panel.hidden) {
     const { x, y, width, height } = panel.getBoundingClientRect();
     area.push({ x, y, width, height });
@@ -394,6 +486,8 @@ function publishHitArea() {
 }
 
 const frames = createFrameLoop((dt, time) => {
+  if (currentTab === 'walk' && !panel.hidden) walk.step(dt);
+  if (arcadeRunning) gameSession?.step(dt);
   if (theaterRunning && !theater.step(dt)) finishActivity();
   if (pet.bounds) {
     pet.step(dt);
@@ -409,15 +503,38 @@ function updateFps() {
   frames.setFps(pet.sleeping ? 10 : fps);
 }
 
-api.onPreferences(settings => {
+const languageInput = select('#language');
+function applyPreferences(settings) {
+  setLanguage(settings.language);
+  languageInput.value = settings.language;
+  languageInput.disabled = false;
   fps = settings.fps;
   volume = settings.volume / 100;
   pet.setSize(settings.size);
+  sceneSize = settings.size;
   const brightness = settings.brightness === 100 ? 'none' : `brightness(${settings.brightness}%)`;
+  document.body.style.setProperty('--scene-filter', brightness);
   for (const element of [select('.scenery'), select('#sprite'), activityCanvas]) element.style.filter = brightness;
   if (activeSound) activeSound.volume = 0.34 * volume;
   updateFps();
-});
+}
+api.onPreferences(applyPreferences);
+if (mode === 'welcome') {
+  api.preferences().then(applyPreferences).catch(() => {});
+  languageInput.addEventListener('change', async () => {
+    const previous = document.documentElement.lang;
+    languageInput.disabled = true;
+    setMessage(settingsError, '');
+    try {
+      applyPreferences(await api.updatePreference('language', languageInput.value));
+    } catch {
+      languageInput.value = previous;
+      setMessage(settingsError, 'Не удалось сохранить настройку.');
+    } finally {
+      languageInput.disabled = false;
+    }
+  });
+}
 
 let windowVisible = false;
 function syncAnimation() {

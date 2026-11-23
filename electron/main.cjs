@@ -1,4 +1,5 @@
 const path = require('node:path');
+const { translate } = require('../renderer/i18n.mjs');
 const { app, BrowserWindow, ipcMain, nativeTheme, powerMonitor, Tray } = require('electron');
 const { loadSettings, validatePreference } = require('./settings.cjs');
 const { createPetState } = require('./pet-state.cjs');
@@ -19,6 +20,7 @@ function start() {
   app.setAppUserModelId('io.github.getfers.stone');
   const userData = app.getPath('userData');
   const settings = loadSettings(userData);
+  const t = text => translate(settings.language, text);
   const pet = createPetState(userData);
   const organizer = createOrganizer(userData);
   const win = process.platform === 'win32';
@@ -29,7 +31,7 @@ function start() {
   let quitting = false;
   let settingsWindow;
 
-  const extra = createOrganizerWindows(() => windows.publishPet(pet.command('alert')));
+  const extra = createOrganizerWindows(() => windows.publishPet(pet.command('alert')), settings);
   const windows = createWindowManager(settings, {
     quit: () => app.quit(),
     refreshMenu,
@@ -42,7 +44,9 @@ function start() {
   });
 
   function refreshMenu() {
-    if (!tray.isDestroyed()) tray.setContextMenu(windows.menu());
+    if (tray.isDestroyed()) return;
+    tray.setToolTip(t('Камешек'));
+    tray.setContextMenu(windows.menu());
   }
 
   function publishPreferences() {
@@ -60,13 +64,13 @@ function start() {
       return;
     }
     const window = createAppWindow({
-      title: 'Камешек · Настройки', width: 626, height: 565,
+      title: t('Камешек · Настройки'), width: 626, height: 620,
       minWidth: 480, minHeight: 470
     });
     settingsWindow = window;
     window.once('closed', () => { settingsWindow = null; });
     window.once('ready-to-show', () => window.show());
-    window.loadFile(path.join(root, 'settings.html')).catch(error => {
+    window.loadFile(path.join(root, 'settings.html'), { query: { language: settings.language } }).catch(error => {
       console.warn('Could not open settings:', error.message);
       if (!window.isDestroyed()) window.destroy();
     });
@@ -79,7 +83,7 @@ function start() {
     try {
       const status = app.getLoginItemSettings(login);
       if (status.openAtLogin !== enabled || status.executableWillLaunchAtLogin !== enabled) {
-        throw new Error('Windows не приняла изменение');
+        throw new Error('Windows rejected the change');
       }
       settings.update({ autostart: enabled });
     } catch (error) {
@@ -97,7 +101,7 @@ function start() {
       console.warn('Could not update schedule:', error.message);
     }
     const alert = organizer.current();
-    extra.showAlert(alert && { ...alert, equipped: pet.snapshot().equipped, volume: settings.volume });
+    extra.showAlert(alert && { ...alert, defaultLabel: organizer.hasDefaultLabel(alert), equipped: pet.snapshot().equipped, volume: settings.volume });
   }
 
   ipcMain.on('stone:mode', (event, mode) => {
@@ -153,7 +157,8 @@ function start() {
     return { ...settings.presentation(), canAutostart };
   });
   ipcMain.handle('stone:update-preference', (event, key, value) => {
-    if (settingsWindow?.webContents !== event.sender || typeof key !== 'string') {
+    const welcomeLanguage = key === 'language' && windows.fromSender(event.sender)?.mode === 'welcome';
+    if (settingsWindow?.webContents !== event.sender && !welcomeLanguage) {
       throw new Error('Invalid settings window');
     }
     validatePreference(key, value);
@@ -163,6 +168,7 @@ function start() {
       return settings.presentation();
     }
     settings.update({ [key]: value });
+    if (key === 'language') refreshMenu();
     return publishPreferences();
   });
   ipcMain.handle('stone:organizer', event => {
@@ -210,7 +216,6 @@ function start() {
   checkSchedule();
 
   const restore = () => windows.show(settings.mode);
-  tray.setToolTip('Камешек');
   refreshMenu();
   tray.on('click', restore);
   app.on('second-instance', (_event, argv) => { if (!argv.includes('--autostart')) restore(); });

@@ -4,40 +4,47 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
-  <title>Камешек · Настройки</title>
+  <title data-i18n="Камешек · Настройки">Камешек · Настройки</title>
   <link rel="stylesheet" href="style.css">
   <script type="module" src="renderer/settings.mjs"></script>
 </head>
 <body class="settings-view">
   <main class="settings-page">
-    <h1>Настройки</h1>
+    <h1 data-i18n="Настройки">Настройки</h1>
+    <div class="settings-row settings-language">
+      <label for="language" data-i18n="Язык интерфейса">Язык интерфейса</label>
+      <select id="language" data-preference="language" disabled>
+        <option value="ru" lang="ru">Русский</option>
+        <option value="en" lang="en">English</option>
+      </select>
+    </div>
     <fieldset class="settings-card" id="appearance" disabled>
-      <legend>Изображение и звук</legend>
+      <legend data-i18n="Изображение и звук">Изображение и звук</legend>
       <div class="settings-row">
-        <label for="fps">Частота кадров</label>
+        <label for="fps" data-i18n="Частота кадров">Частота кадров</label>
         <select id="fps" data-preference="fps">
-          <option value="20">Эконом 20</option>
-          <option value="30">Стандарт 30</option>
-          <option value="60">Плавный 60</option>
+          <option value="20" data-i18n="Эконом 20">Эконом 20</option>
+          <option value="30" data-i18n="Стандарт 30">Стандарт 30</option>
+          <option value="60" data-i18n="Плавный 60">Плавный 60</option>
         </select>
       </div>
       <div class="settings-row">
-        <label for="brightness">Яркость сцены</label>
+        <label for="brightness" data-i18n="Яркость сцены">Яркость сцены</label>
         <div class="settings-slider">
           <input id="brightness" type="range" min="40" max="100" data-preference="brightness">
           <output for="brightness"></output>
         </div>
       </div>
       <div class="settings-row">
-        <label for="size">Размер камешка</label>
+        <label for="size" data-i18n="Размер камешка">Размер камешка</label>
         <select id="size" data-preference="size">
-          <option value="small">Маленький</option>
-          <option value="medium">Средний</option>
-          <option value="large">Большой</option>
+          <option value="small" data-i18n="Маленький">Маленький</option>
+          <option value="medium" data-i18n="Средний">Средний</option>
+          <option value="large" data-i18n="Большой">Большой</option>
         </select>
       </div>
       <div class="settings-row">
-        <label for="volume">Громкость звуков</label>
+        <label for="volume" data-i18n="Громкость звуков">Громкость звуков</label>
         <div class="settings-slider">
           <input id="volume" type="range" min="0" max="100" data-preference="volume">
           <output for="volume"></output>
@@ -45,24 +52,24 @@
       </div>
     </fieldset>
     <fieldset class="settings-card" id="startup" disabled>
-      <legend>Запуск приложения</legend>
+      <legend data-i18n="Запуск приложения">Запуск приложения</legend>
       <div class="settings-row">
-        <label for="autostart">Автозапуск с Windows</label>
+        <label for="autostart" data-i18n="Автозапуск с Windows">Автозапуск с Windows</label>
         <input id="autostart" type="checkbox" role="switch" data-preference="autostart" aria-describedby="autostart-hint">
-        <small id="autostart-hint" hidden>Доступно в portable-сборке Windows.</small>
+        <small id="autostart-hint" hidden data-i18n="Доступно в portable-сборке Windows.">Доступно в portable-сборке Windows.</small>
       </div>
       <div class="settings-row">
-        <label for="startupMode">Режим окна при старте</label>
+        <label for="startupMode" data-i18n="Режим окна при старте">Режим окна при старте</label>
         <select id="startupMode" data-preference="startupMode" aria-describedby="startup-hint">
-          <option value="default">По умолчанию</option>
-          <option value="last">Последний режим</option>
-          <option value="welcome">Главное меню</option>
-          <option value="overlay">Оверлей</option>
-          <option value="widget">Мини-виджет</option>
-          <option value="full">Полное окно</option>
-          <option value="tray">В трее</option>
+          <option value="default" data-i18n="По умолчанию">По умолчанию</option>
+          <option value="last" data-i18n="Последний режим">Последний режим</option>
+          <option value="welcome" data-i18n="Главное меню">Главное меню</option>
+          <option value="overlay" data-i18n="Оверлей">Оверлей</option>
+          <option value="widget" data-i18n="Мини-виджет">Мини-виджет</option>
+          <option value="full" data-i18n="Полное окно">Полное окно</option>
+          <option value="tray" data-i18n="В трее">В трее</option>
         </select>
-        <small id="startup-hint">При обычном запуске откроется последний режим, при входе в Windows камешек останется в трее.</small>
+        <small id="startup-hint" data-i18n="При обычном запуске откроется последний режим, при входе в Windows камешек останется в трее.">При обычном запуске откроется последний режим, при входе в Windows камешек останется в трее.</small>
       </div>
     </fieldset>
     <p id="preferences-status" role="status" class="settings-status"></p>

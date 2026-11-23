@@ -1,3 +1,5 @@
+import { setLanguage, setMessage } from './localization.mjs';
+
 const api = window.stone;
 const controls = [...document.querySelectorAll('[data-preference]')];
 const status = document.querySelector('#preferences-status');
@@ -12,6 +14,7 @@ function updateOutput(control) {
 
 function render(next) {
   settings = next;
+  setLanguage(settings.language);
   for (const control of controls) {
     const value = settings[control.dataset.preference];
     if (control.type === 'checkbox') control.checked = value;
@@ -28,22 +31,23 @@ for (const control of controls) {
     let value = control.value;
     if (key === 'fps' || control.type === 'range') value = Number(value);
     if (control.type === 'checkbox') value = control.checked;
-    status.textContent = '';
+    setMessage(status, '');
     try {
       render(await api.updatePreference(key, value));
     } catch {
       render(settings);
-      status.textContent = key === 'autostart'
-        ? 'Не удалось изменить автозапуск в Windows.' : 'Не удалось сохранить настройку.';
+      setMessage(status, key === 'autostart'
+        ? 'Не удалось изменить автозапуск в Windows.' : 'Не удалось сохранить настройку.');
     }
   });
 }
 
 api.preferences().then(initial => {
   render(initial);
+  document.querySelector('#language').disabled = false;
   autostart.disabled = !initial.canAutostart;
   document.querySelector('#autostart-hint').hidden = initial.canAutostart;
   for (const group of document.querySelectorAll('fieldset')) group.disabled = false;
-}).catch(() => { status.textContent = 'Не удалось загрузить настройки.'; });
+}).catch(() => { setMessage(status, 'Не удалось загрузить настройки.'); });
 
 api.onPreferences(render);

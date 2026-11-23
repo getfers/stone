@@ -145,6 +145,8 @@ function createOrganizer(userData, { clock = Date.now } = {}) {
 
   return {
     update, collect, respond, current,
+    hasDefaultLabel: alert => alert.kind === 'alarm' &&
+      state.alarms.some(alarm => alarm.id === alert.sourceId && !alarm.label),
     snapshot: () => ({
       notes: state.notes, alarms: state.alarms,
       ringing: state.alerts.filter(alert => alert.kind === 'alarm').map(alert => alert.sourceId)

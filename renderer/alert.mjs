@@ -2,6 +2,8 @@ import { createSprite } from './animation.mjs';
 import { createFrameLoop } from './frame-loop.mjs';
 import { alarmAudio, alarmVolume } from './organizer-catalog.mjs';
 
+import { locale, onLanguage, setLanguage, setMessage, t } from './localization.mjs';
+
 const api = window.stone;
 const $ = id => document.getElementById(id);
 const card = $('alert-card');
@@ -9,7 +11,6 @@ const snooze = $('alert-snooze');
 const dismiss = $('alert-dismiss');
 const sprite = createSprite($('alert-sprite-box'), $('alert-sprite'));
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-const time = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
 const pet = {
   scale: 0.76, x: 85, y: 61, time: 0, look: 0, motion: 0, stride: 0, sleepBlend: 0,
   happyUntil: 0, nextBlink: Infinity, effectAt: -Infinity, tilt: 0, equipped: {}
@@ -17,6 +18,16 @@ const pet = {
 let current;
 let audio;
 let start;
+
+function localizeAlert() {
+  if (!current) return;
+  const alarm = current.kind === 'alarm';
+  $('alert-title').textContent = t(alarm ? 'Будильник' : 'Напоминание');
+  $('alert-message').textContent = current.defaultLabel ? t('Будильник') : current.text;
+  const time = new Intl.DateTimeFormat(locale(), { hour: '2-digit', minute: '2-digit' });
+  $('alert-time').textContent = time.format(current.dueAt);
+  dismiss.textContent = t(alarm ? 'Отключить' : 'Понятно');
+}
 
 function show(alert) {
   if (!alert) return;
@@ -26,14 +37,11 @@ function show(alert) {
   pet.equipped = alert.equipped ?? {};
   card.dataset.kind = alert.kind;
   card.hidden = false;
-  $('alert-title').textContent = alarm ? 'Будильник' : 'Напоминание';
-  $('alert-message').textContent = alert.text;
-  $('alert-time').textContent = time.format(alert.dueAt);
+  localizeAlert();
   $('alert-time').dateTime = new Date(alert.dueAt).toISOString();
   snooze.hidden = !alarm;
-  dismiss.textContent = alarm ? 'Отключить' : 'Понятно';
   if (!changed && (!alarm || audio?.src.endsWith('/alarm-' + alert.sound + '.wav'))) return;
-  $('alert-error').textContent = '';
+  setMessage($('alert-error'), '');
   start = performance.now();
   audio?.pause();
   audio = undefined;
@@ -41,7 +49,7 @@ function show(alert) {
     audio = alarmAudio(alert.sound, alert.volume);
     audio.loop = true;
     audio.play().catch(() => {
-      if (current?.id === alert.id) $('alert-error').textContent = 'Не удалось воспроизвести сигнал.';
+      if (current?.id === alert.id) setMessage($('alert-error'), 'Не удалось воспроизвести сигнал.');
     });
     dismiss.focus({ preventScroll: true });
   }
@@ -54,7 +62,7 @@ async function respond(action) {
   try {
     await api.alertAction(current.id, action);
   } catch {
-    $('alert-error').textContent = 'Не удалось завершить уведомление.';
+    setMessage($('alert-error'), 'Не удалось завершить уведомление.');
   } finally {
     snooze.disabled = dismiss.disabled = false;
   }
@@ -77,7 +85,10 @@ function syncAnimation() {
 }
 document.addEventListener('visibilitychange', syncAnimation);
 
+onLanguage(localizeAlert);
+
 function applyPreferences(settings) {
+  setLanguage(settings.language);
   frames.setFps(settings.fps);
   if (audio) audio.volume = alarmVolume(settings.volume);
 }

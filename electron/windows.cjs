@@ -1,4 +1,5 @@
 const path = require('node:path');
+const { translate } = require('../renderer/i18n.mjs');
 const { Menu, dialog, screen } = require('electron');
 const { watchOverlay } = require('./overlay.cjs');
 
@@ -22,6 +23,7 @@ function positionFloatingWindow(entry, display) {
 }
 
 function createWindowManager(settings, { quit, refreshMenu, petSnapshot, openOrganizer, openSettings, setAutostart, canAutostart, canHide }) {
+  const t = text => translate(settings.language, text);
   let current;
   let pending;
 
@@ -59,6 +61,7 @@ function createWindowManager(settings, { quit, refreshMenu, petSnapshot, openOrg
 
     const window = createAppWindow({
       ...options[mode],
+      title: t('Камешек'),
       backgroundColor: mode === 'overlay' ? '#00000000' : '#141414',
       webPreferences: { backgroundThrottling: mode !== 'overlay' }
     });
@@ -99,7 +102,7 @@ function createWindowManager(settings, { quit, refreshMenu, petSnapshot, openOrg
         try {
           settings.update({ mode });
         } catch (error) {
-          dialog.showErrorBox('Камешек', 'Не удалось сохранить режим окна. ' + error.message);
+          dialog.showErrorBox(t('Камешек'), t('Не удалось сохранить режим окна.') + ' ' + error.message);
         }
       }
       const previous = current;
@@ -115,12 +118,12 @@ function createWindowManager(settings, { quit, refreshMenu, petSnapshot, openOrg
     }
     const ready = new Promise(resolve => window.once('ready-to-show', resolve));
     const loaded = window.loadFile(path.join(root, 'index.html'), {
-      query: { mode, roaming: String(settings.roaming) }
+      query: { mode, roaming: String(settings.roaming), language: settings.language }
     });
     Promise.all([ready, loaded]).then(reveal).catch(error => {
       if (window.isDestroyed()) return;
       window.destroy();
-      dialog.showErrorBox('Камешек', 'Не удалось открыть окно. ' + error.message);
+      dialog.showErrorBox(t('Камешек'), t('Не удалось открыть окно.') + ' ' + error.message);
     });
   }
 
@@ -150,39 +153,39 @@ function createWindowManager(settings, { quit, refreshMenu, petSnapshot, openOrg
   function menu() {
     return Menu.buildFromTemplate([
       ...Object.entries(titles).map(([mode, label]) => ({
-        label,
+        label: t(label),
         type: 'radio',
         checked: (current?.mode ?? settings.mode) === mode,
         click: () => show(mode)
       })),
-      { label: 'Занятия и уход', enabled: Boolean(current && current.mode !== 'welcome'),
+      { label: t('Занятия и уход'), enabled: Boolean(current && current.mode !== 'welcome'),
         click: () => {
           if (!current) return;
           show(current.mode);
           current.window.webContents.send('stone:open-panel');
         } },
-      { label: 'Заметки', click: () => openOrganizer('notes') },
-      { label: 'Будильники', click: () => openOrganizer('alarms') },
-      { label: 'Настройки', click: openSettings },
+      { label: t('Заметки'), click: () => openOrganizer('notes') },
+      { label: t('Будильники'), click: () => openOrganizer('alarms') },
+      { label: t('Настройки'), click: openSettings },
       { type: 'separator' },
-      { label: 'Самостоятельное движение', type: 'checkbox', checked: settings.roaming, click: item => {
+      { label: t('Самостоятельное движение'), type: 'checkbox', checked: settings.roaming, click: item => {
         try {
           setRoaming(item.checked);
         } catch (error) {
-          dialog.showErrorBox('Камешек', 'Не удалось сохранить настройку. ' + error.message);
+          dialog.showErrorBox(t('Камешек'), t('Не удалось сохранить настройку.') + ' ' + error.message);
         }
       } },
-      { label: 'Автозапуск с Windows', type: 'checkbox', enabled: canAutostart, checked: settings.autostart,
+      { label: t('Автозапуск с Windows'), type: 'checkbox', enabled: canAutostart, checked: settings.autostart,
         click: item => {
           try {
             setAutostart(item.checked);
           } catch (error) {
             refreshMenu();
-            dialog.showErrorBox('Камешек', 'Не удалось изменить автозапуск. ' + error.message);
+            dialog.showErrorBox(t('Камешек'), t('Не удалось изменить автозапуск.') + ' ' + error.message);
           }
         } },
       { type: 'separator' },
-      { label: 'Выйти', click: quit }
+      { label: t('Выйти'), click: quit }
     ]);
   }
 
