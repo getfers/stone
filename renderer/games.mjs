@@ -1,3 +1,6 @@
+import { message } from './i18n.mjs';
+import { t } from './localization.mjs';
+
 export const games = [
   { id: 'cups', name: 'Три напёрстка', description: 'Запомните, где спрятан камешек.' },
   { id: 'stars', name: 'Ловец искр', description: 'Поймайте как можно больше искр за 15 секунд.' }
@@ -12,6 +15,19 @@ export function startGame(id, host, onFinish) {
   output.setAttribute('role', 'status');
   host.replaceChildren(output);
   let finished = false;
+  let currentMessage;
+  function show(text) {
+    currentMessage = text;
+    output.textContent = t(text);
+  }
+
+  function localize() {
+    if (currentMessage) show(currentMessage);
+    for (const button of host.querySelectorAll('[data-cup]')) {
+      button.setAttribute('aria-label', t('Напёрсток {number}', { number: button.dataset.cup }));
+    }
+    host.querySelector('.game-star')?.setAttribute('aria-label', t('Поймать искру'));
+  }
   let pausedAt;
   let pausedTime = 0;
 
@@ -63,7 +79,7 @@ export function startGame(id, host, onFinish) {
     if (finished) return;
     finished = true;
     stop();
-    output.textContent = message;
+    show(message);
     onFinish(reward);
   }
 
@@ -74,7 +90,7 @@ export function startGame(id, host, onFinish) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'cup';
-      button.setAttribute('aria-label', 'Напёрсток ' + (i + 1));
+      button.dataset.cup = i + 1;
       board.append(button);
       return button;
     });
@@ -91,7 +107,7 @@ export function startGame(id, host, onFinish) {
         button.disabled = true;
         button.dataset.revealed = String(button === buttons[answer]);
       }
-      output.textContent = 'Раунд ' + round + ' из 3 · Камешек под напёрстком ' + (answer + 1);
+      show(message('Раунд {round} из 3 · Камешек под напёрстком {cup}', { round, cup: answer + 1 }));
       after(1100, shuffle);
 
       function shuffle() {
@@ -107,12 +123,12 @@ export function startGame(id, host, onFinish) {
           exchange(buttons[answer], shift, -10);
           exchange(buttons[other], -shift, 10);
         }
-        output.textContent = 'Меняются местами ' + (answer + 1) + ' и ' + (other + 1) + '…';
+        show(message('Меняются местами {first} и {second}…', { first: answer + 1, second: other + 1 }));
         answer = other;
         after(550, () => {
           if (--swaps > 0) shuffle();
           else {
-            output.textContent = 'Где камешек?';
+            show('Где камешек?');
             for (const button of buttons) button.disabled = false;
             buttons[1].focus();
           }
@@ -125,10 +141,10 @@ export function startGame(id, host, onFinish) {
         for (const item of buttons) item.disabled = true;
         buttons[answer].dataset.revealed = 'true';
         if (i === answer) found++;
-        output.textContent = i === answer ? 'Нашёлся!' : 'Камешек был под напёрстком ' + (answer + 1) + '.';
+        show(i === answer ? 'Нашёлся!' : message('Камешек был под напёрстком {cup}.', { cup: answer + 1 }));
         after(850, () => {
           if (round < 3) nextRound();
-          else finish('Угадано ' + found + ' из 3.', 5 + found * 5);
+          else finish(message('Угадано {found} из 3.', { found }), 5 + found * 5);
         });
       }, { signal });
     }
@@ -140,7 +156,6 @@ export function startGame(id, host, onFinish) {
     star.className = 'game-star';
     star.type = 'button';
     star.textContent = '✦';
-    star.setAttribute('aria-label', 'Поймать искру');
     board.append(star);
     host.append(board);
     let count = 0;
@@ -156,10 +171,10 @@ export function startGame(id, host, onFinish) {
       const remaining = Math.max(0, Math.ceil((endsAt - gameTime()) / 1000));
       if (!remaining) {
         star.disabled = true;
-        finish('Искр поймано — ' + count + '.', Math.min(24, 4 + count));
+        finish(message('Искр поймано — {count}.', { count }), Math.min(24, 4 + count));
         return;
       }
-      output.textContent = 'Искры ' + count + ' · ' + remaining + ' с';
+      show(message('Искры {count} · {remaining} с', { count, remaining }));
       after(250, update);
     }
 
@@ -175,5 +190,6 @@ export function startGame(id, host, onFinish) {
     star.focus();
     update();
   }
-  return { stop, setPaused };
+  localize();
+  return { stop, setPaused, localize };
 }

@@ -1,4 +1,7 @@
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
+const { message } = require('../renderer/i18n.mjs');
+const { walks, finds } = require('../renderer/walk-catalog.mjs');
 const { readJson, writeJson } = require('./storage.cjs');
 const { needs, periods, rooms, clothes, trips, care } = require('../renderer/catalog.mjs');
 
@@ -15,6 +18,21 @@ function phaseAt(time, selection) {
   if (hour < 11) return 'morning';
   if (hour < 18) return 'day';
   return 'evening';
+}
+
+function restoreWalk(saved) {
+  if (typeof saved?.token !== 'string' || !Object.hasOwn(walks, saved.id)) return null;
+  const visited = walks[saved.id].stops.filter(stop => Array.isArray(saved.visited) && saved.visited.includes(stop.id));
+  const discovery = saved.discovery;
+  return {
+    id: saved.id,
+    token: saved.token,
+    visited: visited.map(stop => stop.id),
+    lastStop: visited.some(stop => stop.id === saved.lastStop) ? saved.lastStop : null,
+    discovery: discovery?.kind === 'item' && Object.hasOwn(finds, discovery.id) ||
+      discovery?.kind === 'wardrobe' && walks[saved.id].wardrobe.includes(discovery.id)
+      ? { kind: discovery.kind, id: discovery.id } : null
+  };
 }
 
 function restore(saved, now) {
@@ -34,6 +52,7 @@ function restore(saved, now) {
       [id, Number.isFinite(saved.needs?.[id]) ? clamp(saved.needs[id]) : startingNeeds[id]]
     )),
     owned, equipped, trip,
+    exploration: trip ? null : restoreWalk(saved.exploration),
     room: Object.hasOwn(rooms, saved.room) ? saved.room : 'meadow',
     clock: Object.hasOwn(periods, saved.clock) ? saved.clock : 'auto',
     sleeping: ['nap', 'night'].includes(saved.sleeping) ? saved.sleeping : null,
@@ -114,6 +133,27 @@ function createPetState(userData, { clock = Date.now, random = Math.random } = {
     return 'celebrate';
   }
 
+  function discover(walk, stop) {
+    walk.visited.push(stop);
+    walk.lastStop = stop;
+    const destination = walks[walk.id];
+    const rare = destination.wardrobe.filter(item => !state.owned.includes(item));
+    const chance = random();
+    walk.discovery = null;
+    if (rare.length && chance < 0.20) {
+      const id = rare[Math.floor(random() * rare.length)];
+      state.owned.push(id);
+      walk.discovery = { kind: 'wardrobe', id };
+    } else if (chance < 0.75 || walk.visited.length === destination.stops.length) {
+      const items = Object.keys(finds);
+      const id = items[Math.floor(random() * items.length)];
+      gain(finds[id].gains);
+      walk.discovery = { kind: 'item', id };
+    }
+    gain({ energy: 3, mood: 4, fun: 3 });
+    if (walk.visited.length === destination.stops.length) gain({ energy: 6, mood: 6 });
+  }
+
   function tick({ busy, roaming, active }) {
     const now = clock();
     advance(now);
@@ -123,7 +163,7 @@ function createPetState(userData, { clock = Date.now, random = Math.random } = {
     if (state.trip && now >= state.trip.endsAt) {
       effect = finishTrip();
       nextDecision = now + 7000;
-    } else if (!busy && !state.trip && now >= nextDecision) {
+    } else if (!busy && !state.trip && !state.exploration && now >= nextDecision) {
       if (state.sleeping) {
         const rested = state.sleeping === 'nap' && energy >= 88 && now - state.sleptAt >= 25000;
         if (rested || (state.sleeping === 'night' && phase !== 'night')) effect = wake(now);
@@ -158,7 +198,7 @@ function createPetState(userData, { clock = Date.now, random = Math.random } = {
       gain({ mood: 3, fun: 1 });
       status = 'Камешку приятно.';
       effect = 'celebrate';
-    } else if (action === 'sleep' && !state.trip) {
+    } else if (action === 'sleep' && !state.trip && !state.exploration) {
       effect = state.sleeping ? wake(now, true) : sleep('nap', now);
     } else if (action === 'equip' && state.owned.includes(value)) {
       const { slot } = clothes[value];
@@ -172,20 +212,30 @@ function createPetState(userData, { clock = Date.now, random = Math.random } = {
       const updated = tick({ busy: false, roaming: false, active: false });
       save();
       return updated;
-    } else if (action === 'trip' && !state.trip && Object.hasOwn(trips, value)) {
+    } else if (action === 'trip' && !state.trip && !state.exploration && Object.hasOwn(trips, value)) {
       if (state.sleeping) wake(now, true);
       state.trip = { id: value, endsAt: now + trips[value].duration * 1000 };
       state.tripLog = '';
       status = 'Камешек на прогулке.';
       effect = 'walk';
-    } else if (action === 'return' && state.trip) {
+    } else if (action === 'explore' && !state.trip && !state.exploration && Object.hasOwn(walks, value)) {
+      if (state.sleeping) wake(now, true);
+      state.exploration = { id: value, token: randomUUID(), visited: [], lastStop: null, discovery: null };
+      state.tripLog = '';
+      status = 'Камешек на прогулке.';
+    } else if (action === 'discover' && state.exploration?.token === value?.token && state.exploration) {
+      const walk = state.exploration;
+      if (walk.visited.includes(value.stop) || !walks[walk.id].stops.some(stop => stop.id === value.stop)) return snapshot();
+      discover(walk, value.stop);
+    } else if (action === 'return' && (state.trip || state.exploration)) {
       state.trip = null;
+      state.exploration = null;
       status = 'Камешек вернулся домой.';
     } else if (action === 'activity' || action === 'alert') {
       if (state.sleeping) effect = wake(now, true);
     } else if (action === 'game' && Number.isInteger(value) && value >= 1 && value <= 24) {
       gain({ mood: value, fun: value + 7, energy: -4 });
-      status = 'Настроение поднялось на ' + value + '.';
+      status = message('Настроение поднялось на {value}.', { value });
       effect = 'celebrate';
     } else {
       return snapshot();

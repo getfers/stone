@@ -1,3 +1,4 @@
+import { t } from './localization.mjs';
 import { garment, roll } from './art.mjs';
 import { drawClothes, drawEyes } from './stone-art.mjs';
 
@@ -358,10 +359,10 @@ export function createActivities(canvas, onCatchWin, equipped) {
     ctx.textAlign = 'center';
     if (sushiGame.caught >= sushiGame.total) {
       ctx.fillStyle = '#4ade80';
-      ctx.fillText('ВСЕ РОЛЛЫ ПОЙМАНЫ!', canvas.width / 2, 29);
+      ctx.fillText(t('ВСЕ РОЛЛЫ ПОЙМАНЫ!'), canvas.width / 2, 29);
     } else {
       ctx.fillText(
-        'Роллы: ' + sushiGame.caught + ' / ' + sushiGame.total,
+        t('Роллы: {caught} / {total}', sushiGame),
         canvas.width / 2,
         29,
       );

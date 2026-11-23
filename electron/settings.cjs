@@ -4,6 +4,7 @@ const { readJson, writeJson } = require('./storage.cjs');
 const petModes = ['overlay', 'widget', 'full'];
 const startupModes = ['default', 'last', 'welcome', ...petModes, 'tray'];
 const preferences = {
+  language: { default: 'ru', valid: value => ['ru', 'en'].includes(value) },
   fps: { default: 30, valid: value => [20, 30, 60].includes(value) },
   brightness: { default: 100, valid: value => Number.isInteger(value) && value >= 40 && value <= 100 },
   size: { default: 'medium', valid: value => ['small', 'medium', 'large'].includes(value) },
@@ -24,6 +25,7 @@ function loadSettings(userData) {
   };
 
   return {
+    get language() { return state.language; },
     get roaming() { return state.roaming; },
     get mode() { return state.mode; },
     get autostart() { return state.autostart; },

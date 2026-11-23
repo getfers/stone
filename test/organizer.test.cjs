@@ -99,14 +99,14 @@ test('legacy settings are migrated and the last intact data is available after f
   assert.equal(settings.startupWindow(false), 'welcome');
   assert.equal(settings.startupWindow(true), null);
   assert.deepEqual(settings.presentation(), {
-    fps: 30, brightness: 100, size: 'medium', volume: 100, startupMode: 'default', autostart: false
+    language: 'ru', fps: 30, brightness: 100, size: 'medium', volume: 100, startupMode: 'default', autostart: false
   });
   settings.update({ mode: 'widget' });
   settings.update({ fps: 60, brightness: 78, size: 'large', volume: 0, startupMode: 'overlay' });
-  settings.update({ autostart: true });
+  settings.update({ autostart: true, language: 'en' });
   const reopened = loadSettings(dir);
   assert.deepEqual(reopened.presentation(), {
-    fps: 60, brightness: 78, size: 'large', volume: 0, startupMode: 'overlay', autostart: true
+    language: 'en', fps: 60, brightness: 78, size: 'large', volume: 0, startupMode: 'overlay', autostart: true
   });
   assert.equal(reopened.startupWindow(true), 'overlay');
   assert.equal(reopened.startupWindow(false), 'overlay');

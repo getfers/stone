@@ -109,3 +109,34 @@ test('restoring invalid data preserves defaults and rejects unowned equipment', 
   assert.equal(state.phase, 'day');
   assert.equal(state.trip, null);
 });
+
+
+test('exploration resumes across restarts and rewards each stop once', t => {
+  const { open, pet } = setup(t, { needs: { energy: 40, mood: 40 } });
+  pet.command('sleep');
+  const { exploration, sleeping } = pet.command('explore', 'forest');
+  assert.equal(sleeping, null);
+  assert.equal(exploration.id, 'forest');
+  const { token } = exploration;
+  assert.equal(pet.command('discover', { token: 'stale', stop: 'pine' }).exploration.visited.length, 0);
+  assert.equal(pet.command('discover', { token, stop: 'bench' }).exploration.visited.length, 0);
+  const found = pet.command('discover', { token, stop: 'pine' });
+  assert.deepEqual(found.exploration.discovery, { kind: 'wardrobe', id: 'leaf' });
+  assert.ok(found.owned.includes('leaf'));
+  assert.ok(found.needs.energy > 40 && found.needs.mood > 40);
+
+  const resumed = open();
+  assert.deepEqual(resumed.snapshot().exploration.visited, ['pine']);
+  const duplicate = resumed.command('discover', { token, stop: 'pine' });
+  assert.deepEqual(duplicate.needs, found.needs);
+  assert.equal(duplicate.owned.filter(id => id === 'leaf').length, 1);
+  resumed.command('discover', { token, stop: 'moss' });
+  const complete = resumed.command('discover', { token, stop: 'lights' });
+  assert.equal(complete.exploration.visited.length, 3);
+  assert.equal(complete.exploration.discovery.kind, 'item');
+  assert.ok(complete.needs.energy >= 55 && complete.needs.mood >= 58);
+  assert.equal(resumed.command('return').exploration, null);
+  const newWalk = resumed.command('explore', 'mountain');
+  assert.equal(resumed.command('discover', { token, stop: 'cairn' }).exploration.token, newWalk.exploration.token);
+  assert.equal(resumed.snapshot().exploration.visited.length, 0);
+});

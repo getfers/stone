@@ -749,3 +749,159 @@ html:has(> .alert-view) { background: transparent; }
 @media (prefers-reduced-motion: reduce) {
   [data-kind="alarm"] .ring { animation: none; opacity: 1; }
 }
+
+.welcome-language {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.welcome-language select {
+  padding: 5px 9px;
+  background: #252524;
+  color: #efede6;
+  border: 1px solid #40403c;
+  border-radius: 7px;
+  font: inherit;
+}
+.settings-language { margin-bottom: 16px; }
+
+#walk-stage, #walk-stage .walk-scene { position: absolute; inset: 0; }
+#walk-stage .walk-scene { aspect-ratio: auto; }
+.stage:has(#walk-stage:not([hidden])) > :not(#walk-stage) { visibility: hidden; }
+.walk-scene {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  background: #252524;
+  border-radius: 9px;
+  isolation: isolate;
+}
+.walk-scene > canvas, .arcade-surface > canvas, .scene-pet { filter: var(--scene-filter, none); }
+.walk-scene > canvas { position: absolute; width: 100%; height: 100%; }
+.walk-name {
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  left: 12px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: #232321e8;
+  color: var(--accent);
+  font-size: 12px;
+}
+#walk-stage .walk-name {
+  top: 20px;
+  left: 20px;
+  padding: 9px 12px;
+  font-size: 15px;
+}
+.scene-pet {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+.scene-pet canvas { display: block; width: 100%; height: 100%; }
+.walk-markers { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.walk-marker {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+}
+.walk-marker::before { content: ""; position: absolute; inset: -6px; }
+.walk-marker-symbol {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #b4a480;
+  background: #24241f;
+  color: var(--accent);
+  font-size: 17px;
+  box-shadow: 0 0 0 4px #24241f55;
+}
+.walk-marker[data-visited="true"] .walk-marker-symbol { border-color: #918772; font-size: 13px; }
+.walk-marker:hover .walk-marker-symbol, .walk-marker[data-target="true"] .walk-marker-symbol {
+  background: var(--accent);
+  color: #24241f;
+}
+.walk-marker-label {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: #21211feb;
+  white-space: nowrap;
+  font-size: 11px;
+}
+#walk-player .walk-marker-label { visibility: hidden; }
+#walk-player .walk-marker:is(:hover, :focus-visible) .walk-marker-label { visibility: visible; }
+#walk-player .walk-marker[data-stop="lookout"] .walk-marker-label { right: -20px; }
+#walk-progress { color: var(--accent); }
+#activity-name { display: block; margin-bottom: 4px; font-size: 14px; }
+
+.meter-label .meter-name { float: none; color: inherit; }
+.stage.side-scene #pet { visibility: hidden; }
+.stage:has(#game-stage:not([hidden])) > :not(#game-stage) { visibility: hidden; }
+#game-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+  padding: 20px;
+  background: #1e1e1e;
+}
+#game-stage #game-board { width: min(100%, max(200px, calc((100cqh - 90px) * 1.6))); }
+.arcade-surface {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: #242424;
+}
+.arcade-surface > canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  touch-action: none;
+}
+.arcade-surface > canvas:focus-visible { outline-offset: -3px; }
+.arcade-output {
+  margin: 8px 0;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.rhythm-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 6px; }
+.visually-hidden {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+body[data-mode="widget"] .pet-panel:has(.arcade-surface, [data-panel="walk"]:not([hidden]) #walk-player:not([hidden])) .panel-heading {
+  display: none;
+}
+body[data-mode="widget"] #activity-name { margin-bottom: 3px; font-size: 13px; }
+body[data-mode="widget"] .arcade-output { margin-block: 4px; }
+body[data-mode="widget"] #activity-name:not([hidden]) + #activity-status { display: block; line-height: 1.25; }
+body[data-mode="widget"] :is(.arcade-surface, .rhythm-keys) { width: min(100%, 192px); margin-inline: auto; }
+body[data-mode="widget"] .rhythm-keys { margin-top: 4px; }
+body[data-mode="widget"] .rhythm-keys button { padding: 3px 7px; }
+body[data-mode="widget"] .walk-scene { aspect-ratio: 8 / 3; }
+body[data-mode="widget"] #walk-player .panel-status { margin-top: 5px; }
+body[data-mode="widget"] #return-home { margin-top: 5px; }

@@ -1,8 +1,10 @@
 const path = require('node:path');
+const { translate } = require('../renderer/i18n.mjs');
 const { screen } = require('electron');
 const { createAppWindow, root } = require('./app-window.cjs');
 
-function createOrganizerWindows(onAlertShown) {
+function createOrganizerWindows(onAlertShown, settings) {
+  const t = text => translate(settings.language, text);
   let editor;
   let alertWindow;
   let alert;
@@ -17,7 +19,7 @@ function createOrganizerWindows(onAlertShown) {
       return;
     }
     const window = createAppWindow({
-      title: 'Камешек · Органайзер', width: 880, height: 610,
+      title: t('Камешек · Органайзер'), width: 880, height: 610,
       minWidth: 570, minHeight: 490
     });
     editor = window;
@@ -27,7 +29,7 @@ function createOrganizerWindows(onAlertShown) {
   }
 
   function load(window, page) {
-    window.loadFile(path.join(root, page)).catch(error => {
+    window.loadFile(path.join(root, page), { query: { language: settings.language } }).catch(error => {
       console.warn('Could not load %s: %s', page, error.message);
       if (!window.isDestroyed()) window.destroy();
     });
@@ -61,7 +63,7 @@ function createOrganizerWindows(onAlertShown) {
       return;
     }
     const isNew = alert?.id !== next.id;
-    if (!isNew && alert.text === next.text && alert.sound === next.sound && alertWindow) return;
+    if (!isNew && alert.text === next.text && alert.sound === next.sound && alert.defaultLabel === next.defaultLabel && alertWindow) return;
     if (isNew) onAlertShown();
     alert = next;
     if (alertWindow) {
@@ -70,7 +72,7 @@ function createOrganizerWindows(onAlertShown) {
       return;
     }
     const window = createAppWindow({
-      title: 'Камешек · Напоминание', width: 416, height: 316, frame: false,
+      title: t('Камешек · Напоминание'), width: 416, height: 316, frame: false,
       alwaysOnTop: true, skipTaskbar: true, resizable: false, minimizable: false,
       maximizable: false, fullscreenable: false, hasShadow: false, backgroundColor: '#00000000',
       transparent: true, webPreferences: { autoplayPolicy: 'no-user-gesture-required' }

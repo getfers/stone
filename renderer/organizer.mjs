@@ -1,3 +1,4 @@
+import { locale, onLanguage, setLanguage, setMessage, t } from './localization.mjs';
 import { alarmAudio, alarmVolume, sounds, weekdays, weekdayOrder } from './organizer-catalog.mjs';
 
 const api = window.stone;
@@ -21,7 +22,6 @@ const sections = {
     create: 'Новый будильник', edit: 'Редактировать будильник', remove: 'Удалить будильник?'
   }
 };
-const dateTime = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' });
 const tabs = [...document.querySelectorAll('[data-section]')];
 const deletes = [...document.querySelectorAll('.editor-delete')];
 let section = 'notes';
@@ -32,14 +32,18 @@ let volume = 100;
 let busy = false;
 let dirty = false;
 
-for (const [value, label] of Object.entries(sounds)) alarmSound.add(new Option(label, value));
+for (const [value, label] of Object.entries(sounds)) {
+  const option = new Option(t(label), value);
+  option.dataset.i18n = label;
+  alarmSound.add(option);
+}
 for (const day of weekdayOrder) {
   const label = document.createElement('label');
   const input = document.createElement('input');
   input.type = 'checkbox';
   input.value = day;
   const title = document.createElement('span');
-  title.textContent = weekdays[day];
+  setMessage(title, weekdays[day]);
   label.append(input, title);
   $('alarm-days').append(label);
 }
@@ -53,7 +57,7 @@ function localInput(timestamp) {
 function stopPreview() {
   preview?.pause();
   preview = null;
-  $('preview-sound').textContent = 'Прослушать';
+  setMessage($('preview-sound'), 'Прослушать');
 }
 
 function fill(entry) {
@@ -61,10 +65,10 @@ function fill(entry) {
   dirty = false;
   selected = entry?.id;
   const info = sections[section];
-  $('editor-title').textContent = entry ? info.edit : info.create;
+  setMessage($('editor-title'), entry ? info.edit : info.create);
   $('new-entry').hidden = !entry;
   for (const button of deletes) button.hidden = !entry;
-  status.textContent = '';
+  setMessage(status, '');
   noteForm.reset();
   alarmForm.reset();
   if (!entry) return;
@@ -80,27 +84,40 @@ function fill(entry) {
   }
 }
 
-function showSection(next) {
-  if (next !== section && dirty && !confirm('Перейти к другому разделу? Несохранённые изменения будут потеряны.')) return;
+function confirmDiscard(text) {
+  const prompt = $('discard-dialog');
+  if (prompt.open) return false;
+  setMessage($('discard-title'), text);
+  prompt.returnValue = '';
+  prompt.showModal();
+  return new Promise(resolve => prompt.addEventListener('close', () => {
+    resolve(prompt.returnValue === 'discard');
+  }, { once: true }));
+}
+
+async function showSection(next) {
+  if (next !== section && dirty && !await confirmDiscard(
+    'Перейти к другому разделу? Несохранённые изменения будут потеряны.'
+  )) return;
   if (next !== section) {
     section = next;
     fill();
   }
   const info = sections[section];
-  $('organizer-title').textContent = info.title;
-  $('organizer-subtitle').textContent = info.subtitle;
+  setMessage($('organizer-title'), info.title);
+  setMessage($('organizer-subtitle'), info.subtitle);
   for (const tab of tabs) tab.setAttribute('aria-pressed', String(tab.dataset.section === section));
   noteForm.hidden = section !== 'notes';
   alarmForm.hidden = section !== 'alarms';
   renderList();
 }
 
-function edit(entry) {
+async function edit(entry) {
   if (entry?.id === selected && entry) {
     focusEditor();
     return;
   }
-  if (dirty && !confirm('Открыть другую запись? Несохранённые изменения будут потеряны.')) return;
+  if (dirty && !await confirmDiscard('Открыть другую запись? Несохранённые изменения будут потеряны.')) return;
   fill(entry);
   renderList();
   focusEditor();
@@ -112,9 +129,11 @@ function focusEditor() {
 
 function renderList() {
   const lastFocus = document.activeElement?.id;
+  const dateTime = new Intl.DateTimeFormat(locale(), { dateStyle: 'medium', timeStyle: 'short' });
+  const timeOfDay = new Intl.DateTimeFormat(locale(), { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
   const info = sections[section];
   empty.hidden = state[section].length > 0;
-  empty.textContent = info.empty;
+  setMessage(empty, info.empty);
   const items = state[section].map(entry => {
     const item = document.createElement('li');
     item.className = 'record';
@@ -128,13 +147,14 @@ function renderList() {
     if (section === 'notes') {
       title.textContent = entry.text;
       description.textContent = entry.at
-        ? (entry.fired ? 'Сработало · ' : 'Напоминание · ') + dateTime.format(entry.at)
-        : 'Заметка';
+        ? t(entry.fired ? 'Сработало' : 'Напоминание') + ' · ' + dateTime.format(entry.at)
+        : t('Заметка');
     } else {
-      title.textContent = entry.time + (entry.label ? ' · ' + entry.label : '');
-      const repeat = entry.days.length ? weekdayOrder.filter(d => entry.days.includes(d)).map(d => weekdays[d]).join(', ') : 'Один раз';
-      const when = entry.snoozeAt ? 'Отложен до ' + dateTime.format(entry.snoozeAt) : repeat;
-      description.textContent = when + ' · ' + sounds[entry.sound];
+      const [hour, minute] = entry.time.split(':').map(Number);
+      title.textContent = timeOfDay.format(Date.UTC(2000, 0, 1, hour, minute)) + (entry.label ? ' · ' + entry.label : '');
+      const repeat = entry.days.length ? weekdayOrder.filter(d => entry.days.includes(d)).map(d => t(weekdays[d])).join(', ') : t('Один раз');
+      const when = entry.snoozeAt ? t('Отложен до {time}', { time: dateTime.format(entry.snoozeAt) }) : repeat;
+      description.textContent = when + ' · ' + t(sounds[entry.sound]);
     }
     open.append(title, description);
     open.addEventListener('click', () => edit(entry));
@@ -144,7 +164,7 @@ function renderList() {
       toggle.type = 'button';
       toggle.id = 'toggle-' + entry.id;
       toggle.className = 'alarm-toggle';
-      toggle.setAttribute('aria-label', 'Будильник ' + title.textContent);
+      toggle.setAttribute('aria-label', t('Будильник {title}', { title: title.textContent }));
       toggle.setAttribute('role', 'switch');
       toggle.setAttribute('aria-checked', String(Boolean(entry.nextAt || entry.snoozeAt || state.ringing?.includes(entry.id))));
       toggle.addEventListener('click', () => mutate('toggle', { id: entry.id }));
@@ -160,7 +180,7 @@ async function mutate(action, data) {
   if (busy) return;
   busy = true;
   const currentSection = section;
-  status.textContent = '';
+  setMessage(status, '');
   try {
     state = await api.updateOrganizer(currentSection, action, data);
     if (section === currentSection && action !== 'toggle') {
@@ -172,11 +192,11 @@ async function mutate(action, data) {
     }
     renderList();
     if (section === currentSection) {
-      status.textContent = { save: 'Сохранено', delete: 'Удалено', toggle: 'Состояние будильника изменено' }[action];
+      setMessage(status, { save: 'Сохранено', delete: 'Удалено', toggle: 'Состояние будильника изменено' }[action]);
     }
   } catch (error) {
-    status.textContent = error.message.includes('future')
-      ? 'Укажите будущие дату и время.' : 'Не удалось сохранить изменение.';
+    setMessage(status, error.message.includes('future')
+      ? 'Укажите будущие дату и время.' : 'Не удалось сохранить изменение.');
   } finally {
     busy = false;
   }
@@ -186,7 +206,7 @@ noteForm.addEventListener('submit', event => {
   event.preventDefault();
   const text = $('note-text').value.trim();
   if (!text) {
-    status.textContent = 'Введите текст заметки.';
+    setMessage(status, 'Введите текст заметки.');
     $('note-text').focus();
     return;
   }
@@ -197,8 +217,14 @@ noteForm.addEventListener('submit', event => {
 });
 alarmForm.addEventListener('submit', event => {
   event.preventDefault();
+  const time = $('alarm-time');
+  if (!time.value) {
+    setMessage(status, 'Укажите время будильника.');
+    time.focus();
+    return;
+  }
   mutate('save', {
-    id: selected, time: $('alarm-time').value, label: $('alarm-label').value,
+    id: selected, time: time.value, label: $('alarm-label').value,
     days: days.filter(input => input.checked).map(input => Number(input.value)),
     sound: alarmSound.value, enabled: $('alarm-enabled').checked
   });
@@ -207,7 +233,7 @@ for (const form of [noteForm, alarmForm]) form.addEventListener('input', () => {
 for (const tab of tabs) tab.addEventListener('click', () => showSection(tab.dataset.section));
 $('new-entry').addEventListener('click', () => edit());
 for (const button of deletes) button.addEventListener('click', () => {
-  $('delete-title').textContent = sections[section].remove;
+  setMessage($('delete-title'), sections[section].remove);
   dialog.returnValue = '';
   dialog.showModal();
 });
@@ -222,20 +248,22 @@ $('preview-sound').addEventListener('click', () => {
   }
   const audio = alarmAudio(alarmSound.value, volume);
   preview = audio;
-  $('preview-sound').textContent = 'Остановить';
+  setMessage($('preview-sound'), 'Остановить');
   audio.addEventListener('ended', stopPreview, { once: true });
   audio.play().catch(() => {
     if (preview !== audio) return;
     stopPreview();
-    status.textContent = 'Не удалось воспроизвести сигнал.';
+    setMessage(status, 'Не удалось воспроизвести сигнал.');
   });
 });
 
 function applyVolume(settings) {
+  setLanguage(settings.language);
   volume = settings.volume;
   if (preview) preview.volume = alarmVolume(volume);
 }
 
+onLanguage(renderList);
 api.onPreferences(applyVolume);
 api.preferences().then(applyVolume).catch(() => {});
 
@@ -249,5 +277,5 @@ try {
   state = initial.state;
   showSection(initial.tab);
 } catch {
-  status.textContent = 'Не удалось открыть органайзер.';
+  setMessage(status, 'Не удалось открыть органайзер.');
 }
